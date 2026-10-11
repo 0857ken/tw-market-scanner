@@ -113,11 +113,11 @@ def validate(payload, now=None):
                     raise ValueError('Credential-free source HTTPS URLs required')
     if payload['mode'] == 'live' and (not payload['stocks'] or payload['sources'].get('quotes', {}).get('asOf') != as_of or not re.fullmatch('[a-f0-9]{64}', payload['sources'].get('quotes', {}).get('sha256') or '')):
         raise ValueError('live requires stock observations and source digest')
-    def bounded(rows, module):
-        source_day = payload['sources'].get(module, {}).get('asOf')
+    def bounded(rows, module, modules=None):
+        source_day = max((payload['sources'].get(key, {}).get('asOf') or '' for key in (modules or [module])), default='')
         if rows and (not source_day or any(r['date'] > source_day for r in rows)):
             raise ValueError(f'{module} observation newer than source asOf or missing provenance')
-    bounded(payload['indexHistory'], 'indexHistory')
+    bounded(payload['indexHistory'], 'indexHistory', ['indexHistory', 'index'])
     bounded(payload['futures'], 'futures')
     bounded(payload['creditHistory'], 'credit')
     for stock in payload['stocks']:

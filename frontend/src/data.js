@@ -103,8 +103,8 @@ export function validateMarket(payload, now=new Date()) {
   }
   if(payload.mode==='live'&&(!isDate(payload.asOf)||!payload.stocks.length||payload.sources.quotes?.asOf!==payload.asOf||!/^([a-f0-9]{64})$/.test(payload.sources.quotes?.sha256||''))) throw new Error('live 需要可追溯的正式價量快照，不能把 DEMO 換標籤');
   if(payload.creditHistory?.length&&payload.sources.credit?.priceBasis!=='adjusted-total-return') throw new Error('信用資料必須明確為還原權息價');
-  const bounded=(rows,module)=>{const day=payload.sources[module]?.asOf;if(rows.length&&(!day||rows.some(r=>r.date>day)))throw new Error(`${module} 觀測日期超過來源資料日或缺少來源日期`);};
-  bounded(payload.indexHistory,'indexHistory');bounded(payload.futures,'futures');bounded(payload.creditHistory,'credit');
+  const bounded=(rows,module,modules=[module])=>{const day=modules.map(key=>payload.sources[key]?.asOf||'').sort().at(-1);if(rows.length&&(!day||rows.some(r=>r.date>day)))throw new Error(`${module} 觀測日期超過來源資料日或缺少來源日期`);};
+  bounded(payload.indexHistory,'indexHistory',['indexHistory','index']);bounded(payload.futures,'futures');bounded(payload.creditHistory,'credit');
   for(const stock of payload.stocks){bounded(stock.institutional||[],'institutional');bounded(stock.margin?[stock.margin]:[],'margin');}
   if(payload.quoteSessions!=null){
     if(!Array.isArray(payload.quoteSessions))throw new Error('quoteSessions 必須是陣列');

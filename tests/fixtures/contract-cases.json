@@ -279,5 +279,44 @@
         ]
       ]
     ]
+  },
+  {
+    "name": "index continuation uses daily source provenance",
+    "valid": true,
+    "ops": [
+      [
+        "set",
+        [
+          "sources",
+          "indexHistory",
+          "asOf"
+        ],
+        "2026-10-06"
+      ]
+    ]
+  },
+  {
+    "name": "index rows cannot exceed both source dates",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "sources",
+          "indexHistory",
+          "asOf"
+        ],
+        "2026-10-06"
+      ],
+      [
+        "set",
+        [
+          "sources",
+          "index",
+          "asOf"
+        ],
+        "2026-10-06"
+      ]
+    ]
   }
 ]
