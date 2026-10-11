@@ -1,0 +1,53 @@
+name: update-data
+
+on:
+  schedule:
+    # UTC 時間;台北 = UTC+8
+    - cron: '30 8 * * 1-5'    # 台北 16:30(收盤價/T86/期貨已公布)
+    - cron: '30 14 * * 1-5'   # 台北 22:30(補抓融資餘額等較晚公布的資料)
+  workflow_dispatch: {}        # 允許手動觸發
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Fetch credit spread (Yahoo Finance)
+        run: python scripts/fetch_credit_spread.py
+        continue-on-error: true
+
+      - name: Fetch TWSE (quotes / T86 / margin / TAIEX)
+        run: python scripts/fetch_twse.py
+        continue-on-error: true
+
+      - name: Fetch TAIFEX (institutional futures)
+        run: python scripts/fetch_taifex.py
+        continue-on-error: true
+
+      - name: Build market.json
+        run: python scripts/build_dataset.py
+
+      - name: Commit & push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          git commit -m "data: $(date -u +%F)" || echo "no changes"
+          git push

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "mode": "example",
+  "asOf": "2026-10-08",
+  "source": "範例結構（數值不代表真實行情）",
+  "universe": "以下僅為欄位示範；完整均線需至少120個交易日",
+  "indexHistory": [
+    {"date":"2026-10-07","close":20000},
+    {"date":"2026-10-08","close":20200}
+  ],
+  "stocks": [
+    {"symbol":"2330","name":"台積電","sector":"半導體","marketCapM":10000000,
+      "history":[{"date":"2026-10-07","close":100,"volumeShares":2000000},{"date":"2026-10-08","close":101,"volumeShares":3000000}],
+      "institutional":[{"date":"2026-10-08","foreignShares":200000,"trustShares":-50000,"dealerShares":10000}],
+      "margin":{"balanceShares":1500000,"usagePct":27.5}
+    }
+  ],
+  "futures":[{"date":"2026-10-08","foreign":-12000,"trust":1900,"dealer":-2300}],
+  "creditHistory":[]
+}
