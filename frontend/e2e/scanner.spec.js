@@ -79,3 +79,14 @@ test('DEMO is explicit opt-in; relabelled demo file is refused',async({page})=>{
   await page.locator('input[type=file]').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalid))});
   await expect(page.getByRole('dialog')).toContainText('schemaVersion: 2');
 });
+
+test('missing calendar marks freshness unknown and forged credit approval is rejected',async({page})=>{
+  const value=structuredClone(market);delete value.calendar;value.sources.quotes.status='fresh';
+  await page.route('**/market.json',route=>route.fulfill({json:value}));
+  await page.goto('./');await expect(page.locator('.data-banner')).toContainText('日期待核對');
+  value.creditRule.status='confirmed';
+  await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
+  await expect(page.locator('.global-error')).toContainText('信用規則待原作者確認');
+  await expect(page.locator('.data-banner')).toContainText(market.asOf);
+  await go(page,'信用利差');await expect(page.locator('.credit-light')).toContainText('規則待確認');
+});

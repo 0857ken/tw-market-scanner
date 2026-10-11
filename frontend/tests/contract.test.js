@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {validateMarket,makeDemo,makeUnavailable,effectiveStatus} from '../src/data.js';
-import {stockMetrics,computeBreadth,institutionalStreak,computeCredit,creditLight} from '../src/logic.js';
+import {lastMA,stockMetrics,computeBreadth,institutionalStreak,computeCredit,creditLight} from '../src/logic.js';
 const captured=JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/official-market-20261007.json',import.meta.url),'utf8'));
 const copy=()=>structuredClone(captured);
 test('Python official v2 output passes the independent JS adapter',()=>{
@@ -78,4 +78,41 @@ test('breadth does not compress a missing expected trading session into a valid 
   const history=dates.filter((_,i)=>i!==10).map(date=>({date,close:100,volumeShares:1000}));
   const latest=computeBreadth([{history}],[dates.at(-1)],dates).at(-1);
   assert.equal(latest.n20,0);assert.equal(latest.a20,null);
+});
+
+const cases=JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/contract-cases.json',import.meta.url),'utf8'));
+for(const c of cases)test(`shared contract: ${c.name}`,()=>{
+  const value=copy();
+  for(const [op,path,replacement] of c.ops){
+    const parent=path.slice(0,-1).reduce((obj,key)=>obj[key],value);
+    if(op==='delete')delete parent[path.at(-1)];else parent[path.at(-1)]=replacement;
+  }
+  const run=()=>validateMarket(value,new Date('2026-10-08T21:30:00+08:00'));
+  if(c.valid)assert.doesNotThrow(run);else assert.throws(run);
+});
+test('unknown calendars never preserve a saved fresh flag; errors and stale remain visible',()=>{
+  assert.equal(effectiveStatus({status:'fresh',asOf:'2026-10-07'},null),'unknown');
+  assert.equal(effectiveStatus({status:'stale',asOf:'2026-10-07'},null),'stale');
+  assert.equal(effectiveStatus({status:'error',asOf:'2026-10-07'},null),'error');
+  const source={status:'fresh',asOf:'2026-12-31'},now=new Date('2027-01-01T18:00:00+08:00');
+  const calendar={rows:[{date:'2027-01-01',closed:true}]};
+  assert.equal(effectiveStatus(source,calendar,now),'unknown');
+  calendar.rows.push({date:'2026-01-01',closed:true});
+  assert.equal(effectiveStatus(source,calendar,now),'fresh');
+});
+test('missing final session cannot display yesterday as current quote or MA',()=>{
+  const dates=Array.from({length:21},(_,i)=>new Date(Date.UTC(2026,0,1+i)).toISOString().slice(0,10));
+  const stock={history:dates.slice(0,-1).map(date=>({date,close:100,volumeShares:1000}))};
+  const metrics=stockMetrics(stock,dates);
+  assert.equal(metrics.date,dates.at(-1));assert.equal(metrics.close,null);assert.equal(metrics.ma20,null);
+  assert.equal(metrics.breakout60,null);assert.equal(metrics.change,null);
+  assert.equal(computeBreadth([stock],[dates.at(-1)],dates).at(-1).n20,0);
+});
+test('MA20/60/120/240 each requires a complete latest window including current day',()=>{
+  for(const n of [20,60,120,240]){
+    const h=Array.from({length:n},(_,i)=>({close:i+1}));
+    assert.equal(lastMA(h.slice(1),n),null);
+    assert.equal(lastMA(h,n),(n+1)/2);
+    h[n-1].close=null;assert.equal(lastMA(h,n),null);
+  }
 });

@@ -11,14 +11,14 @@ concurrency:
 jobs:
   build:
     if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false && github.ref == 'refs/heads/main' && vars.PAGES_RELEASE_APPROVED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Overlay verified data without modifying main
@@ -26,7 +26,7 @@ jobs:
           git fetch origin market-data
           git restore --source origin/market-data --worktree -- data
           python -m pipeline.release_check
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -43,7 +43,7 @@ jobs:
           retention-days: 1
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

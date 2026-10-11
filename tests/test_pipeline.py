@@ -18,6 +18,27 @@ NOW = datetime(2026, 10, 8, 21, 30, tzinfo=ZoneInfo('Asia/Taipei'))
 
 
 class PipelineTests(unittest.TestCase):
+    def test_shared_contract_cases(self):
+        baseline=read_json(ROOT/'tests/fixtures/official-market-20261007.json')
+        for case in read_json(ROOT/'tests/fixtures/contract-cases.json'):
+            with self.subTest(case=case['name']):
+                value=copy.deepcopy(baseline)
+                for op in case['ops']:
+                    parent=value
+                    for key in op[1][:-1]: parent=parent[key]
+                    if op[0]=='delete': del parent[op[1][-1]]
+                    else: parent[op[1][-1]]=op[2]
+                if case['valid']: validate(value, NOW)
+                else:
+                    with self.assertRaises(ValueError): validate(value, NOW)
+
+    def test_cross_year_requires_both_calendar_years(self):
+        now=datetime(2027,1,1,18,tzinfo=ZoneInfo('Asia/Taipei'))
+        rows=[{'date':'2027-01-01','closed':True}]
+        self.assertEqual(expected_session(now,rows),('2026-12-31',False))
+        rows.append({'date':'2026-01-01','closed':True})
+        self.assertEqual(expected_session(now,rows),('2026-12-31',True))
+
     def test_roc_and_gregorian_dates_are_validated(self):
         self.assertEqual(iso_date('1151007'), '2026-10-07')
         self.assertEqual(iso_date('20261007'), '2026-10-07')
@@ -172,6 +193,7 @@ class PipelineTests(unittest.TestCase):
         raw['sources']['quotes']['status']='fresh';raw['sources']['companies']['status']='fresh'
         before_close=datetime(2026,10,8,15,tzinfo=ZoneInfo('Asia/Taipei'))
         self.assertEqual(check(raw,before_close),'2026-10-07')
+        raw['sources']['institutional']['asOf']='2026-10-07'
         raw['stocks'][0]['institutional']=[{'date':'2026-10-07','foreignShares':1000}]
         with self.assertRaisesRegex(ValueError,'redistribution rights pending'):check(raw,before_close)
 

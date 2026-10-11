@@ -1,0 +1,283 @@
+[
+  {
+    "name": "valid existing fixture",
+    "valid": true,
+    "ops": []
+  },
+  {
+    "name": "UTC timestamp crossing Taipei midnight",
+    "valid": true,
+    "ops": [
+      [
+        "set",
+        [
+          "generatedAt"
+        ],
+        "2026-10-06T17:00:00Z"
+      ]
+    ]
+  },
+  {
+    "name": "source after Taipei generation date",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "generatedAt"
+        ],
+        "2026-10-06T15:00:00Z"
+      ]
+    ]
+  },
+  {
+    "name": "invalid timestamp calendar day",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "generatedAt"
+        ],
+        "2026-02-30T10:00:00Z"
+      ]
+    ]
+  },
+  {
+    "name": "numeric symbol",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "stocks",
+          0,
+          "symbol"
+        ],
+        2330
+      ]
+    ]
+  },
+  {
+    "name": "explicit null price",
+    "valid": true,
+    "ops": [
+      [
+        "set",
+        [
+          "stocks",
+          0,
+          "history",
+          0,
+          "close"
+        ],
+        null
+      ]
+    ]
+  },
+  {
+    "name": "absent close",
+    "valid": false,
+    "ops": [
+      [
+        "delete",
+        [
+          "stocks",
+          0,
+          "history",
+          0,
+          "close"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "absent index array",
+    "valid": false,
+    "ops": [
+      [
+        "delete",
+        [
+          "indexHistory"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "absent credit array",
+    "valid": false,
+    "ops": [
+      [
+        "delete",
+        [
+          "creditHistory"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "absent futures array",
+    "valid": false,
+    "ops": [
+      [
+        "delete",
+        [
+          "futures"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "wrong history type",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "stocks",
+          0,
+          "history"
+        ],
+        {}
+      ]
+    ]
+  },
+  {
+    "name": "source array",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "sources"
+        ],
+        []
+      ]
+    ]
+  },
+  {
+    "name": "source name required",
+    "valid": false,
+    "ops": [
+      [
+        "delete",
+        [
+          "sources",
+          "quotes",
+          "name"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "future futures row",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "futures",
+          0,
+          "date"
+        ],
+        "2099-01-01"
+      ]
+    ]
+  },
+  {
+    "name": "futures beyond declared source",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "sources",
+          "futures",
+          "asOf"
+        ],
+        "2026-10-06"
+      ]
+    ]
+  },
+  {
+    "name": "future source with forged generation",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "generatedAt"
+        ],
+        "2099-01-01T00:00:00Z"
+      ],
+      [
+        "set",
+        [
+          "sources",
+          "margin",
+          "asOf"
+        ],
+        "2099-01-01"
+      ]
+    ]
+  },
+  {
+    "name": "payload cannot approve credit",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "creditRule",
+          "status"
+        ],
+        "confirmed"
+      ]
+    ]
+  },
+  {
+    "name": "payload cannot change credit window",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "creditRule",
+          "window"
+        ],
+        190
+      ]
+    ]
+  },
+  {
+    "name": "duplicate sessions",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "quoteSessions"
+        ],
+        [
+          "2026-10-07",
+          "2026-10-07"
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "future quote session",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "quoteSessions"
+        ],
+        [
+          "2026-10-08"
+        ]
+      ]
+    ]
+  }
+]

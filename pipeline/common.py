@@ -100,6 +100,7 @@ def expected_session(now, calendar):
     closed = {r['date'] for r in calendar if r['closed']}
     while candidate.weekday() >= 5 or candidate.isoformat() in closed:
         candidate -= timedelta(days=1)
+        known = known and candidate.year in years
     return candidate.isoformat(), known
 
 

@@ -55,7 +55,7 @@ export function detectRegime(history, period = 20) {
 export function stockMetrics(stock, sessions = []) {
   const raw = stock?.history || [];
   const map = new Map(raw.map(r=>[r.date,r]));
-  const dates = sessions.filter(d=>d >= raw[0]?.date && d <= raw.at(-1)?.date);
+  const dates = sessions.filter(d=>d >= raw[0]?.date);
   const h = dates.length ? dates.map(date=>map.get(date)||{date,close:null,volumeShares:null}) : raw;
   const latest = h.at(-1), previous = h.at(-2);
   const ma20 = lastMA(h, 20), ma60 = lastMA(h, 60), ma120 = lastMA(h, 120);
@@ -77,7 +77,7 @@ export function computeBreadth(stocks, dates, sessions = []) {
   for (const stock of stocks) {
     const raw = stock.history || [];
     const map = new Map(raw.map(r=>[r.date,r]));
-    const aligned = sessions.filter(d=>d>=raw[0]?.date && d<=raw.at(-1)?.date);
+    const aligned = sessions.filter(d=>d>=raw[0]?.date);
     const h = aligned.length ? aligned.map(date=>map.get(date)||{date,close:null,volumeShares:null}) : raw;
     let sums = { 20: 0, 60: 0, 120: 0 }, missing = {20:0,60:0,120:0};
     for (let i = 0; i < h.length; i++) {
