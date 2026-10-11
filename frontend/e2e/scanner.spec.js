@@ -1,0 +1,81 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+const market=JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/official-market-20261007.json',import.meta.url),'utf8'));
+const pages=['資料健康','我的關注','信用利差','市場廣度','市場體制','台股熱力圖','美股熱力圖','高點突破','產業輪動','盤中量能','法人買賣超','連續買賣超','期貨籌碼','融資水位','券商分點','盤前觀察','研究週報','持股水位'];
+async function loaded(page){
+  await page.route('**/market.json',route=>route.fulfill({json:market}));
+  await page.goto('./');await expect(page.locator('.data-banner')).toContainText(market.asOf);
+}
+async function go(page,name){
+  if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
+  await page.locator('.sidebar .nav-item').filter({hasText:new RegExp(`^${name}$`)}).click();
+  await expect(page.locator('.page-top h1')).toHaveText(name);
+  if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
+}
+for(const width of [320,375,390,430,1440]){
+  test(`${width}px production subpath: every module renders without horizontal overflow`,async({page})=>{
+    await page.setViewportSize({width,height:844});
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await loaded(page);
+    for(const name of pages){
+      await go(page,name);
+      await expect(page.locator('main')).toBeVisible();
+      const measured=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,body:document.body.scrollWidth}));
+      expect(measured.scroll,`${name} root overflow`).toBeLessThanOrEqual(measured.client+1);
+      expect(measured.body,`${name} body overflow`).toBeLessThanOrEqual(measured.client+1);
+      const outside=await page.locator('.panel,.dashboard-hero,.data-banner,.metrics-grid').evaluateAll(els=>els.filter(e=>{const r=e.getBoundingClientRect();return r.right>innerWidth+1||r.left<-1}).map(e=>e.className));
+      expect(outside,`${name} cards outside viewport`).toEqual([]);
+    }
+    expect(errors).toEqual([]);
+    if(width===390){await go(page,'資料健康');await page.screenshot({path:'../test-results/mobile-health.png',fullPage:true});}
+  });
+}
+test('real data date, warmup and pending credit are truthful',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await loaded(page);
+  await expect(page.locator('.data-banner')).toContainText('資料落後');
+  await expect(page.locator('.metric').filter({hasText:'60 日高點突破'})).toContainText('暖機中');
+  await page.screenshot({path:'../test-results/mobile-home.png',fullPage:false});
+  await go(page,'信用利差');await expect(page.locator('.credit-light')).toContainText('規則待確認');
+  await expect(page.locator('.credit-keys')).toHaveCount(0);
+  await page.screenshot({path:'../test-results/mobile-credit.png',fullPage:true});
+  await go(page,'美股熱力圖');await expect(page.getByText('未接入市場資料',{exact:true})).toBeVisible();
+});
+test('search, stock drawer, local watchlist persistence and table sort',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await loaded(page);
+  await page.locator('#stock-search').fill('2330');
+  await page.locator('.search-results button').first().click();
+  await expect(page.getByRole('dialog')).toContainText('2330');
+  await page.getByRole('button',{name:'加入關注',exact:true}).click();
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.reload();await expect(page.locator('.data-banner')).toContainText(market.asOf);
+  await go(page,'我的關注');await expect(page.locator('tbody')).toContainText('2330');
+  await page.getByRole('button',{name:'收盤價',exact:true}).click();
+  await expect(page.locator('th[aria-sort="ascending"]')).toContainText('收盤價');
+  await go(page,'我的關注');
+  const table=page.locator('.table-scroll').first();
+  const dims=await table.evaluate(e=>({scroll:e.scrollWidth,client:e.clientWidth}));
+  expect(dims.scroll).toBeGreaterThanOrEqual(dims.client);
+});
+test('missing default feed stays unavailable and never falls back to DEMO',async({page})=>{
+  await page.route('**/market.json',route=>route.fulfill({status:503,body:'source unavailable'}));
+  await page.goto('./');await expect(page.locator('.global-error')).toContainText('HTTP 503');
+  await expect(page.locator('.data-banner')).toContainText('尚未載入');
+  await expect(page.locator('.top-mode')).toHaveText('待資料');
+  await expect(page.locator('.metric').filter({hasText:'加權指數'})).toContainText('—');
+});
+test('failed refresh retains the last observed date and shows the error',async({page})=>{
+  await loaded(page);
+  await page.route('**/market.json',route=>route.fulfill({status:503,body:'failure'}));
+  await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
+  await expect(page.locator('.global-error')).toContainText('HTTP 503');
+  await expect(page.locator('.data-banner')).toContainText(market.asOf);
+});
+test('DEMO is explicit opt-in; relabelled demo file is refused',async({page})=>{
+  await loaded(page);await page.getByRole('button',{name:'接入資料',exact:true}).click();
+  await page.getByRole('button',{name:'檢視虛構 DEMO（僅供介面示意）'}).click();
+  await expect(page.locator('.data-banner')).toContainText('虛構 DEMO');
+  await page.getByRole('button',{name:'接入資料',exact:true}).click();
+  const invalid={...market,schemaVersion:1,mode:'live'};
+  await page.locator('input[type=file]').setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalid))});
+  await expect(page.getByRole('dialog')).toContainText('schemaVersion: 2');
+});

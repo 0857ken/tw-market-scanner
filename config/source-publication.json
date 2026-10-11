@@ -1,0 +1,52 @@
+{
+  "reviewedAt": "2026-10-08",
+  "license": "https://data.gov.tw/license",
+  "modules": {
+    "companies": {
+      "status": "verified-open-data",
+      "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
+      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。"
+    },
+    "quotes": {
+      "status": "verified-open-data",
+      "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
+      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。",
+      "dataset": "https://data.gov.tw/dataset/11549"
+    },
+    "index": {
+      "status": "verified-open-data",
+      "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
+      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。"
+    },
+    "indexHistory": {
+      "status": "verified-open-data",
+      "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
+      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。"
+    },
+    "calendar": {
+      "status": "verified-open-data",
+      "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
+      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。"
+    },
+    "margin": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/en/datasets/11680",
+      "note": "政府資料集列出集中市場融資融券餘額、對應欄位、免費及 OGDL；使用同名官方盤後報表。"
+    },
+    "futures": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/dataset/11596",
+      "note": "依期貨契約及日期的法人交易/未平倉欄位；OGDL，僅取 TX 未平倉口數淨額。"
+    },
+    "institutional": {
+      "status": "pending",
+      "evidence": "https://www.twse.com.tw/zh/terms/use.html",
+      "note": "T86 可讀不等於可轉載；目前未核實對應政府開放資料集或書面授權，預設不抓取、不載入、不公開。"
+    },
+    "credit": {
+      "status": "pending",
+      "evidence": "https://ranaroussi.github.io/yfinance/",
+      "note": "未取得可公開轉載的 HYG/SHY/SPY 還原價，預設停用。"
+    }
+  }
+}

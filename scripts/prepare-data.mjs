@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {makeUnavailable,validateMarket} from '../frontend/src/data.js';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const source=path.join(root,'data/market.json');
+const payload=fs.existsSync(source)?validateMarket(JSON.parse(fs.readFileSync(source,'utf8'))):makeUnavailable();
+const target=path.join(root,'frontend/public/market.json');
+fs.mkdirSync(path.dirname(target),{recursive:true});
+fs.writeFileSync(target,JSON.stringify(payload));
+console.log(`Prepared ${payload.mode}: observation date ${payload.asOf||'unavailable'}, ${payload.stocks.length} stocks. No synthetic fallback.`);

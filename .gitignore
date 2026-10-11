@@ -1,0 +1,16 @@
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+*.key
+*.token
+screenshots/
+test-results/
+playwright-report/
+data/raw/institutional_*.json
+.DS_Store

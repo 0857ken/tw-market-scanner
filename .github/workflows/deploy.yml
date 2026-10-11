@@ -1,0 +1,52 @@
+name: Approved GitHub Pages release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: scanner-pages
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false && github.ref == 'refs/heads/main' && vars.PAGES_RELEASE_APPROVED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Overlay verified data without modifying main
+        run: |
+          git fetch origin market-data
+          git restore --source origin/market-data --worktree -- data
+          python -m pipeline.release_check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_MARKET_URL: https://raw.githubusercontent.com/0857ken/tw-market-scanner/market-data/data/market.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+          retention-days: 1
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
