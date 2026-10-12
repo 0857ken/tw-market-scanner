@@ -110,3 +110,10 @@ export function validateResearch(payload){
     }
   }
 }
+
+export function breakoutSelection(stocks,period,minVol=0,search=''){
+  const eligible=stocks.filter(s=>s.breakouts?.[period]?.eligible===true);
+  const rows=eligible.map(s=>({...s,dist:s.breakouts[period].dist,breakout:s.breakouts[period].hit===true}))
+    .filter(s=>num(s.dist)&&(minVol===0||num(s.volRatio)&&s.volRatio>=minVol)&&`${s.symbol}${s.name}`.includes(search));
+  return {eligible:eligible.length,rows,hits:rows.filter(s=>s.breakout).sort((a,b)=>b.dist-a.dist),near:rows.filter(s=>!s.breakout&&s.dist>=-3).sort((a,b)=>b.dist-a.dist)};
+}

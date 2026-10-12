@@ -115,3 +115,24 @@ for(const width of [320,390,1440])test(`Stage3B ${width}px markets, basis, cover
   expect(errors).toEqual([]);
   if(width===390)await page.screenshot({path:'../test-results/stage3b-mobile.png',fullPage:true});
 });
+
+test('Stage3C mobile daily dates, separate universes, search and empty eligibility',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.route('**/market.json',route=>route.fulfill({json:integrated}));
+  await page.goto('./');await expect(page.locator('.data-banner')).toContainText(integrated.asOf);
+  const daily=page.locator('.daily-breadth');
+  if(integrated.sources.quotes.asOf!==integrated.sources.tpexQuotes.asOf)await expect(daily).toContainText('上市櫃日期不一致');
+  for(const scope of ['TWSE','TPEx']){
+    await page.getByLabel('市場母體',{exact:true}).selectOption(scope);
+    await expect(daily).toContainText(integrated.research.markets[scope].asOf);
+    await expect(daily).toContainText('平盤');
+  }
+  const stock=integrated.stocks.find(s=>s.market==='TPEx'&&s.history.some(r=>r.date===integrated.sources.tpexQuotes.asOf&&r.close>0));
+  await page.locator('#stock-search').fill(stock.symbol);await page.locator('.search-results button').first().click();
+  await expect(page.getByRole('dialog')).toContainText(stock.name);await page.keyboard.press('Escape');
+  await go(page,'高點突破');await expect(page.locator('main')).toContainText('0 檔具備足夠資料');
+  await go(page,'台股熱力圖');await expect(page.locator('.recharts-wrapper').first()).toBeVisible();
+  await go(page,'產業輪動');await expect(page.locator('main')).toContainText('有效檔數');
+  await go(page,'連續買賣超');await expect(page.locator('main')).toContainText('不以零散快照推定');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});

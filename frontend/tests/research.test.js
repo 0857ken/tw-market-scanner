@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {alignedPrices,researchMetrics,researchBreadth,coverage,memberOn,suspendedOn,windowCheck} from '../src/research.js';
+import {alignedPrices,researchMetrics,researchBreadth,coverage,memberOn,suspendedOn,windowCheck,breakoutSelection} from '../src/research.js';
 import {validateMarket} from '../src/data.js';
 import {getSignals} from '../src/logic.js';
 const days=Array.from({length:301},(_,i)=>new Date(Date.UTC(2025,0,1+i)).toISOString().slice(0,10));
@@ -72,7 +72,8 @@ test('production Stage3B contract and actual coverage are explicit; payload cann
   assert.ok(p.stocks.filter(s=>s.market==='TPEx').some(s=>s.institutional?.length));
   const a=getSignals(p,'TWSE','raw'),b=getSignals(p,'TPEx','raw'),all=getSignals(p,'ALL','raw');
   assert.equal(all.coverage.total,a.coverage.total+b.coverage.total);
-  assert.equal(all.coverage.quotes,a.coverage.quotes+b.coverage.quotes);
+  if(a.anchor===b.anchor)assert.equal(all.coverage.quotes,a.coverage.quotes+b.coverage.quotes);
+  else {assert.equal(all.daily.datesAligned,false);assert.equal(all.daily.available,false);}
   assert.equal(all.coverage.ma[240],0);assert.equal(all.coverage.adjusted,0);
   assert.equal(all.coverage.breakout240,0);
   for(const mutate of [x=>x.stocks[0].history[0].adjustedClose=1,x=>x.stocks[0].history[0].rawClose=1,x=>x.research.markets.TPEx.calendarStatus='verified',x=>x.stocks[0].adjustment.status='verified']){
@@ -85,4 +86,34 @@ for(const c of contractCases)test(`research contract: ${c.name}`,()=>{
   const p=JSON.parse(fs.readFileSync(new URL('../../data/market.json',import.meta.url),'utf8'));
   for(const [,path,value] of c.ops){const parent=path.slice(0,-1).reduce((o,k)=>o[k],p);parent[path.at(-1)]=value;}
   if(c.valid)assert.doesNotThrow(()=>validateMarket(p));else assert.throws(()=>validateMarket(p));
+});
+
+const dailyMarket=()=>({asOf:anchor,researchVersion:1,stocks:[fixture('TWSE'),fixture('TPEx')],sources:{},research:{markets:{TWSE:{...meta},TPEx:{...meta}}}});
+test('Stage3C daily counts use official changes independently of adjusted warmup',()=>{
+  const p=dailyMarket();p.stocks[0].adjustment.status='unavailable';p.stocks[1].adjustment.status='unavailable';
+  p.stocks[0].history.at(-1).changeAmount=0;p.stocks[1].history.at(-1).changeAmount=-2;
+  const s=getSignals(p,'ALL','adjusted');
+  assert.equal(s.daily.flat,1);assert.equal(s.daily.down,1);assert.equal(s.daily.up,0);assert.equal(s.daily.eligible,2);
+  assert.equal(s.breakoutEligible,0);assert.equal(s.hits.length,0);
+});
+test('Stage3C missing change never falls back across an unverified price window',()=>{
+  const p=dailyMarket();p.stocks[0].history.at(-1).changeAmount=null;p.stocks[1].history.at(-1).close=null;p.stocks[1].history.at(-1).rawClose=null;
+  const s=getSignals(p,'ALL','raw');assert.equal(s.daily.available,false);assert.equal(s.daily.eligible,0);assert.equal(s.latest[0].change,null);
+});
+test('Stage3C market date mismatch blocks combined counts; individual scope retains its own day',()=>{
+  const p=dailyMarket();p.research.markets.TWSE.asOf=days.at(-2);p.research.markets.TWSE.sessions=days.slice(0,-1);p.stocks[0].history.pop();
+  const all=getSignals(p,'ALL','raw'),tw=getSignals(p,'TWSE','raw'),otc=getSignals(p,'TPEx','raw');
+  assert.equal(all.daily.available,false);assert.equal(all.daily.up,null);assert.equal(all.breadth.at(-1).nChange,0);
+  assert.equal(tw.anchor,days.at(-2));assert.equal(tw.daily.eligible,1);assert.equal(tw.latest[0].date,days.at(-2));assert.equal(otc.anchor,anchor);
+});
+test('Stage3C zero eligible differs from zero hits after a search or volume filter',()=>{
+  const s={symbol:'1234',name:'test',volRatio:null,breakouts:{20:{eligible:true,hit:false,dist:-1}}};
+  let r=breakoutSelection([s],20,0,'missing');assert.equal(r.eligible,1);assert.equal(r.rows.length,0);assert.equal(r.hits.length,0);
+  r=breakoutSelection([s],20,2);assert.equal(r.eligible,1);assert.equal(r.rows.length,0);
+  s.breakouts[20]={eligible:false,hit:true,dist:20};r=breakoutSelection([s],20);assert.equal(r.eligible,0);assert.equal(r.hits.length,0);
+});
+test('Stage3C partial calendar never emits a MA or breakout even with 301 prices',()=>{
+  const p=dailyMarket();for(const m of Object.values(p.research.markets))m.calendarStatus='partial';
+  const s=getSignals(p,'ALL','raw');assert.equal(s.hits.length,0);assert.equal(s.breakoutEligible,0);
+  assert.ok(s.latest.every(x=>[20,60,120,240].every(n=>x['ma'+n]===null&&x.breakouts[n].hit===null)));
 });

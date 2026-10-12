@@ -17,6 +17,7 @@ from .schema import validate, valid_number
 SOURCES = {
     'tpexCompanies': ('TPEx 上櫃公司基本資料', 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O'),
     'tpexQuotes': ('TPEx 上櫃股票收盤行情', 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes'),
+    'tpexInstitutional': ('TPEx 上櫃三大法人買賣明細', 'https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading'),
     'companies': ('TWSE 上市公司基本資料', 'https://openapi.twse.com.tw/v1/opendata/t187ap03_L'),
     'quotes': ('TWSE 上市個股日成交資訊', 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'),
     'index': ('TWSE 發行量加權股價指數', 'https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX'),
@@ -34,7 +35,7 @@ def snapshots(data_dir, module):
     return rows[-300:]
 
 
-def collect(data_dir, sources, module, parser, now, params=None):
+def collect(data_dir, sources, module, parser, now, params=None, fetcher=None):
     name, url = SOURCES[module]
     prior = sources.get(module, {})
     policy = PUBLICATION[module]
@@ -47,10 +48,31 @@ def collect(data_dir, sources, module, parser, now, params=None):
         return None
     meta['license'] = LICENSE
     try:
-        raw, digest, actual_url = get_json(url, params)
+        raw, digest, actual_url = (fetcher or get_json)(url, params)
         d, rows = parser(raw)
         if module != 'calendar' and date.fromisoformat(d) > now.astimezone(TPE).date():
             raise ValueError('Source date is in the future')
+        history = snapshots(data_dir, module)
+        last = history[-1] if history else None
+        if last and d < last['date']:
+            raise ValueError('Source date regressed; keep last valid snapshot')
+        if module in ('quotes', 'tpexQuotes', 'tpexInstitutional'):
+            local = now.astimezone(TPE)
+            if date.fromisoformat(d).weekday() >= 5 or d == local.date().isoformat() and (local.hour, local.minute) < (16, 30):
+                raise ValueError('Not a completed weekday EOD observation')
+            calendars = snapshots(data_dir, 'calendar') if module == 'quotes' else []
+            if calendars and any(r['date'] == d and r['closed'] for r in calendars[-1]['rows']):
+                raise ValueError('Quote date is a known closed session')
+        existing = read_json(data_dir / 'raw' / f'{module}_{d}.json')
+        if existing:
+            canonical = lambda values: sorted(json.dumps(r, sort_keys=True, ensure_ascii=False) for r in values)
+            if canonical(existing['rows']) != canonical(rows):
+                raise ValueError('Same-date source revision requires explicit review; original retained')
+            sources[module] = {**meta, 'url': existing['url'], 'asOf': d, 'fetchedAt': existing['fetchedAt'],
+                               'sha256': existing['sha256'], 'rowCount': len(rows), 'fetchStatus': 'ok', 'status': 'unknown',
+                               'snapshotAction': 'unchanged', 'lastResponseSha256': digest}
+            print(f'{module}: {d}, unchanged snapshot', flush=True)
+            return existing
         snap = {'module': module, 'date': d, 'rows': rows, 'url': actual_url,
                 'sha256': digest, 'fetchedAt': meta['lastAttemptAt'], 'license': LICENSE}
         write_json(data_dir / 'raw' / f'{module}_{d}.json', snap)
@@ -167,7 +189,7 @@ def build(data_dir, sources, calendar, credit, now):
         if key in ('calendar', 'credit') or source.get('fetchStatus') in ('error', 'disabled'):
             continue
         source['status'] = 'fresh' if source.get('asOf') and source['asOf'] >= expected else 'stale'
-        if not known:
+        if not known or key.startswith('tpex'):
             source['status'] = 'unknown'
     calendar_by_date = {r['date']: r for r in calendar}
     local_day = now.astimezone(TPE).date()

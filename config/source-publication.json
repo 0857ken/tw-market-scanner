@@ -10,8 +10,9 @@
     "quotes": {
       "status": "verified-open-data",
       "evidence": "https://openapi.twse.com.tw/v1/swagger.json",
-      "note": "TWSE OpenAPI 明載政府資料開放授權；仍需標示來源、日期及加工方式。",
-      "dataset": "https://data.gov.tw/dataset/11549"
+      "note": "資料集11549直接列示的當日CSV與TWSE OpenAPI；只核准無歷史日期參數之最新快照，保留來源、版本與顯名。",
+      "dataset": "https://data.gov.tw/dataset/11549",
+      "currentCsv": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data"
     },
     "index": {
       "status": "verified-open-data",

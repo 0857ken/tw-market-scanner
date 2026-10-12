@@ -120,16 +120,22 @@ export function institutionalStreak(rows, key, sessions = []) {
   return { direction: sign, days, shares };
 }
 export function getSignals(market, scope='ALL', basis='adjusted') {
-  const stocks = (market?.stocks || []).filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,market.asOf));
-  const latest = stocks.map(s=>{const meta=marketMeta(market,s.market||'TWSE');return {...stockMetrics(s,[...new Set([...(meta.sessions||[]),...(market.asOf?[market.asOf]:[])])].sort()),...researchMetrics(s,meta,basis,market.asOf)};});
+  const anchor=scope==='ALL'?market.asOf:marketMeta(market,scope).asOf;
+  const alignedMarket={...market,asOf:anchor};
+  const stocks = (market?.stocks || []).filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,anchor));
+  const latest = stocks.map(s=>{const meta=marketMeta(market,s.market||'TWSE');const result={...stockMetrics(s,[...new Set([...(meta.sessions||[]),...(anchor?[anchor]:[])])].filter(d=>d<=anchor).sort()),...researchMetrics(s,meta,basis,anchor)};const q=s.history.find(r=>r.date===anchor);result.change=q&&numeric(q.close)&&q.close>0&&numeric(q.changeAmount)&&q.close-q.changeAmount>0?(q.close/(q.close-q.changeAmount)-1)*100:null;return result;});
   const dates = [...new Set(stocks.flatMap(s => (s.history || []).map(x => x.date)))].sort().slice(-120);
-  const breadth = researchBreadth(stocks, market, basis, [...new Set([...dates,...(market.asOf?[market.asOf]:[])])].sort());
+  const breadth = researchBreadth(stocks, market, basis, [...new Set([...dates.filter(d=>d<=anchor),...(anchor?[anchor]:[])])].sort());
+  const datesAligned=scope!=='ALL'||!market.researchVersion||marketMeta(market,'TWSE').asOf===marketMeta(market,'TPEx').asOf;
+  const changes=latest.filter(s=>numeric(s.change));
+  const daily={date:anchor,available:datesAligned&&changes.length>0,datesAligned,eligible:datesAligned?changes.length:0,total:stocks.length,up:datesAligned?changes.filter(s=>s.change>0).length:null,down:datesAligned?changes.filter(s=>s.change<0).length:null,flat:datesAligned?changes.filter(s=>s.change===0).length:null};
+  if(!datesAligned&&breadth.length)Object.assign(breadth.at(-1),{up:0,down:0,flat:0,nChange:0});
   const credit = computeCredit(market.creditHistory || [], CREDIT.window, market.creditRule || CREDIT);
   const creditNow = credit.at(-1);
   const futures = (market.futures || []).at(-1);
   const regime = detectRegime(market.indexHistory || []);
-  const hits = latest.filter(s => s.date===market.asOf && s.breakout60);
-  const breakoutEligible = latest.filter(s=>s.date===market.asOf && s.breakoutEligible).length;
+  const hits = latest.filter(s => s.date===anchor && s.breakout60);
+  const breakoutEligible = latest.filter(s=>s.date===anchor && s.breakoutEligible).length;
   const b = breadth.at(-1);
   const alerts = [];
   if (creditNow?.light === 'RED') alerts.push({ level: 'danger', page: '信用利差', msg: `信用壓力指標 ${format(creditNow.indicator, 4)}，進入紅燈區` });
@@ -139,5 +145,5 @@ export function getSignals(market, scope='ALL', basis='adjusted') {
   if (numeric(futures?.foreign) && futures.foreign < -15000) alerts.push({ level: 'warn', page: '期貨籌碼', msg: `外資期貨淨部位 ${format(futures.foreign)} 口；需連同選擇權及避險部位判讀` });
   const marginRisk = latest.filter(s => numeric(s.margin?.usagePct) && s.margin.usagePct >= 80);
   if (marginRisk.length) alerts.push({ level: 'warn', page: '融資水位', msg: `${marginRisk.length} 檔達到自訂融資使用率觀察門檻 80%（非斷頭保證）` });
-  return { scope, basis, coverage:coverage(stocks,market,basis,market.asOf), latest, dates, breadth, credit, creditNow, regime, futures, hits, breakoutEligible, marginRisk, alerts };
+  return { scope, basis, anchor, daily, coverage:coverage(stocks,alignedMarket,basis,anchor), latest, dates, breadth, credit, creditNow, regime, futures, hits, breakoutEligible, marginRisk, alerts };
 }

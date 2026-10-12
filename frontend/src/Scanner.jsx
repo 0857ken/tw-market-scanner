@@ -1,4 +1,4 @@
-import {MARKET_NAMES,BASIS_NAMES,securityKey,memberOn,marketMeta} from './research.js';
+import {MARKET_NAMES,BASIS_NAMES,securityKey,memberOn,marketMeta,breakoutSelection} from './research.js';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
   ResponsiveContainer, ComposedChart, LineChart, BarChart, Line, Bar, Cell, Area,
@@ -175,7 +175,7 @@ function BreadthView({ signals, universe }) {
         </ComposedChart></ResponsiveContainer></div> : <Empty title="廣度尚未成熟" detail="需至少 20 / 60 / 120 / 240 個交易日的收盤資料才會顯示對應均線。"/>}
       <div className="tip"><Info size={14}/> 30%／70% 僅為觀察門檻，不是經回測驗證的買賣點；若不是完整上市櫃母體，請勿稱為全市場廣度。</div>
     </Panel>
-    <Panel title="上漲與下跌家數" subtitle="以官方漲跌價差或有效前日收盤比較；限當日有價格，平盤不列上漲／下跌"><div className="breadth-split"><div><b style={{color:COLORS.red}}>{last?.nChange?last.up:'—'}</b><small>上漲</small></div><div><b style={{color:COLORS.green}}>{last?.nChange?last.down:'—'}</b><small>下跌</small></div></div></Panel>
+    <Panel title="上漲與下跌家數" subtitle={`資料日 ${signals.daily.date||"—"} · 官方漲跌價差；可判定 ${signals.daily.eligible}/${signals.daily.total} 檔；兩市場日期不同不合計`}><div className="breadth-split"><div><b style={{color:COLORS.red}}>{signals.daily.available?signals.daily.up:'—'}</b><small>上漲</small></div><div><b style={{color:COLORS.green}}>{signals.daily.available?signals.daily.down:'—'}</b><small>下跌</small></div></div></Panel>
   </>;
 }
 function RegimeView({ market, signals }) {
@@ -207,7 +207,7 @@ function Heatmap({ market, signals, us, onStock }) {
   const tw = !us, raw = tw ? signals.latest : (market.usStocks || (market.mode === 'demo' ? US_DEMO.map(([symbol,name,cap,change])=>({symbol,name,marketCapM:cap*100000,change,sector:'美股示範'})) : []));
   const sectors = ['全部', ...new Set(raw.map(r=>r.sector || '未分類'))];
   const filtered = raw.filter(r => sector === '全部' || (r.sector || '未分類') === sector);
-  const ranked = [...filtered].sort((a,b) => rank === '漲跌幅' ? (b.change || 0) - (a.change || 0) : (b.marketCapM || 0) - (a.marketCapM || 0));
+  const ranked = filtered.filter(r=>numeric(r.change)).sort((a,b) => rank === '漲跌幅' ? (b.change || 0) - (a.change || 0) : (b.marketCapM || 0) - (a.marketCapM || 0));
   const useCap=ranked.every(r=>numeric(r.marketCapM)&&r.marketCapM>0);
   const treemap = ranked.filter(r => numeric(r.change)).map(r => ({ ...r, size: useCap?r.marketCapM:1, marketStyle:tw?'tw':'us' }));
   const up = treemap.filter(r=>r.change>0).length, down = treemap.filter(r=>r.change<0).length;
@@ -222,16 +222,12 @@ function Heatmap({ market, signals, us, onStock }) {
 }
 function BreakoutView({ signals, onStock }) {
   const [period,setPeriod] = useState(60), [minVol,setMinVol] = useState(0), [search,setSearch] = useState('');
-  const rows = signals.latest.map(s => {
-    const result=s.breakouts?.[period];
-    return {...s, dist:result?.dist??null, breakout:result?.hit===true};
-  }).filter(s => numeric(s.dist) && (minVol===0 || numeric(s.volRatio)&&s.volRatio>=minVol) && `${s.symbol}${s.name}`.includes(search));
-  const hits = rows.filter(s=>s.breakout).sort((a,b)=>b.dist-a.dist), near = rows.filter(s=>!s.breakout && s.dist >= -3).sort((a,b)=>b.dist-a.dist);
+  const {eligible,rows,hits,near}=breakoutSelection(signals.latest,period,minVol,search);
   const cols = [nameCol, {key:'dist',name:'距高點',render:r=><span className="num" style={{color:r.dist>0?COLORS.red:COLORS.yellow}}>{signed(r.dist)}</span>},{key:'volRatio',name:'量比',render:r=>numeric(r.volRatio)?`${format(r.volRatio,2)}x`:'—'},changeCol];
   return <><Panel title="N 日高點突破" subtitle="今日選定基礎收盤價 > 前 N 個完整交易日最高價；未還原窗口含公司事件或事件覆蓋不明時不判定" right={<Toggle value={String(period)} setValue={v=>setPeriod(Number(v))} options={['20','60','120','240']}/> }>
     <div className="filters"><label>量能比至少 <select value={minVol} onChange={e=>setMinVol(Number(e.target.value))}><option value={0}>不限</option><option value={1}>1.0x</option><option value={1.5}>1.5x</option><option value={2}>2.0x</option></select></label><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋代號或名稱"/></div>
-    <div className="section-subtitle"><span className="headline-number" style={{color:COLORS.red}}>{rows.length?hits.length:"暖機中"}</span> 檔突破　·　{rows.length} 檔具備完整 N+1 日及價格／事件驗證</div>
-    <DataGrid rows={hits} columns={cols} onRow={onStock} empty="目前沒有符合條件的突破股"/>
+    <div className="section-subtitle"><span className="headline-number" style={{color:COLORS.red}}>{eligible?hits.length:"暖機中"}</span> 檔突破　·　{eligible} 檔具備完整 N+1 日及價格／事件驗證 · 篩選後 {rows.length} 檔</div>
+    <DataGrid rows={hits} columns={cols} onRow={onStock} empty={eligible?"0 檔符合目前篩選條件":"0 檔具備足夠資料，不能判定突破"}/>
   </Panel><Panel title="接近突破" subtitle="距離前 N 日高點 3% 以內（尚未突破）"><DataGrid rows={near.slice(0,15)} columns={cols} onRow={onStock}/></Panel></>;
 }
 function InstitutionView({ market, signals, onStock }) {
@@ -259,7 +255,7 @@ function InstitutionView({ market, signals, onStock }) {
     <DataGrid rows={rows.slice(0,30)} onRow={onStock} columns={[nameCol,{key:'netLots',name:'買賣超(張)',render:r=><span style={{color:candleColor(r.netLots)}} className="num">{format(r.netLots,1)}</span>},changeCol]}/>
   </Panel><Panel title={`${kind}買賣超趨勢`} subtitle="僅加總有完整數值之股票，缺值排除；各日樣本數獨立，不代表全部上市金額">
     {chart.length ? <div style={{height:240}} className="chart-wrap"><ResponsiveContainer><BarChart data={chart} margin={{left:-4,top:9,right:5}}><CartesianGrid stroke="#203046" vertical={false}/><XAxis dataKey="date" {...axisProps} tickFormatter={lightDate}/><YAxis {...axisProps}/><Tooltip {...tooltipProps} formatter={v=>`${format(v,0)} 張`}/><ReferenceLine y={0} stroke="#7183a0"/><Bar dataKey="net" name="淨買賣(張)">{chart.map((r,i)=><Cell key={i} fill={candleColor(r.net)}/>)}</Bar></BarChart></ResponsiveContainer></div>
-    : <Empty title="無法人歷史資料" detail="請從 T86 匯入逐日法人股數。"/>}
+    : <Empty title="無法人歷史資料" detail="僅使用已核准來源的逐日法人股數；TWSE T86 維持停用。"/>}
   </Panel></>;
 }
 function StreakView({ market, signals, onStock }) {
@@ -267,10 +263,12 @@ function StreakView({ market, signals, onStock }) {
   if(market.sources?.institutional?.status==='unavailable') return <Panel title="法人連續買賣超尚未接入"><Empty title="資料公開授權待核實" detail={market.sources.institutional.reason}/></Panel>;
   const key = kind==='外資'?'foreignShares':'trustShares';
   const instDate = [...new Set(market.stocks.flatMap(s => (s.institutional || []).map(r => r.date)))].sort().at(-1);
-  const rows = signals.latest.filter(s => s.institutional?.at(-1)?.date === instDate).map(s=>({...s, streak:institutionalStreak(s.institutional,key,market.institutionalSessions||[])})).filter(s=>s.streak.days >= +days);
+  const calendarVerified=signals.scope!=='ALL'&&marketMeta(market,signals.scope).calendarStatus==='verified';
+  const rows = (calendarVerified?signals.latest:[]).filter(s => s.institutional?.at(-1)?.date === instDate).map(s=>({...s, streak:institutionalStreak(s.institutional,key,market.institutionalSessions||[])})).filter(s=>s.streak.days >= +days);
   const cols = [nameCol,{key:'days',name:'連續天數',render:r=><b>{r.streak.days} 天</b>},{key:'shares',name:'累計張數',render:r=><span style={{color:candleColor(r.streak.shares)}}>{format(sharesToLots(r.streak.shares),1)}</span>},changeCol];
   return <Panel title="法人連續買賣超" subtitle={`最新法人資料日 ${instDate || "—"}；數值缺漏及 0 張會中斷連續性，未納入過期資料`} right={<Toggle value={kind} setValue={setKind} options={['外資','投信']}/> }>
     <div className="filters"><label>至少 <select value={days} onChange={e=>setDays(e.target.value)}>{['3','5','10'].map(v=><option key={v} value={v}>{v} 日</option>)}</select></label></div>
+    <p>{calendarVerified?"依已驗證交易日判定":"0 檔具備連續交易日驗證；不以零散快照推定連買或連賣"}</p>
     <div className="two-columns"><div><h3 className="subhead">連續買超</h3><DataGrid rows={rows.filter(s=>s.streak.direction>0).sort((a,b)=>b.streak.days-a.streak.days)} columns={cols} onRow={onStock}/></div>
       <div><h3 className="subhead">連續賣超</h3><DataGrid rows={rows.filter(s=>s.streak.direction<0).sort((a,b)=>b.streak.days-a.streak.days)} columns={cols} onRow={onStock}/></div></div>
   </Panel>;
@@ -296,12 +294,12 @@ function SectorView({ signals, onStock }) {
   const [activeSector, setActiveSector] = useState(null);
   const groups = Object.values(signals.latest.reduce((acc,s)=>{
     const key = s.sector || '未分類'; if(!acc[key]) acc[key]={name:key,stocks:[]}; acc[key].stocks.push(s);return acc;
-  },{})).map(g=>({name:g.name,count:g.stocks.length,advancers:g.stocks.filter(s=>s.change>0).length,
+  },{})).map(g=>({name:g.name,count:g.stocks.length,valid:g.stocks.filter(s=>numeric(s.change)).length,advancers:g.stocks.filter(s=>s.change>0).length,
     avgChange:avg(g.stocks.map(s=>s.change).filter(numeric)), capWeighted:(()=>{const eligible=g.stocks.filter(s=>numeric(s.change)&&numeric(s.marketCapM));const total=eligible.reduce((a,s)=>a+s.marketCapM,0);return total?eligible.reduce((a,s)=>a+s.change*s.marketCapM,0)/total:null;})(),stocks:g.stocks
-  })).sort((a,b)=>(b.avgChange||0)-(a.avgChange||0));
+  })).sort((a,b)=>(b.avgChange??-Infinity)-(a.avgChange??-Infinity));
   return <><Panel title="產業輪動" subtitle="預設用等權平均漲跌幅，避免少數權值股完全主導；樣本不足時勿外推全產業">
-    <div className="sector-list">{groups.map((s,i)=><div key={s.name} className="sector-row"><span className="sector-index">{String(i+1).padStart(2,'0')}</span><b>{s.name}</b><span className="sector-bar-holder"><i style={{background:candleColor(s.avgChange),width:`${Math.min(100,Math.abs(s.avgChange||0)*12)}%`}}/></span><span className="num" style={{color:candleColor(s.avgChange)}}>{signed(s.avgChange)}</span><span className="muted tiny">{s.advancers}/{s.count} 上漲</span></div>)}</div>
-  </Panel><Panel title="族群明細" subtitle="點選產業列，可展開該產業的成分股"><DataGrid rows={groups} onRow={r => setActiveSector(prev => prev === r.name ? null : r.name)} columns={[{key:'name',name:'產業',left:true},{key:'count',name:'檔數'}, {key:'avgChange',name:'等權漲跌',render:r=><Percent value={r.avgChange}/>},{key:'capWeighted',name:'市值加權',render:r=><Percent value={r.capWeighted}/>}]} />
+    <div className="sector-list">{groups.map((s,i)=><div key={s.name} className="sector-row"><span className="sector-index">{String(i+1).padStart(2,'0')}</span><b>{s.name}</b><span className="sector-bar-holder"><i style={{background:candleColor(s.avgChange),width:`${Math.min(100,Math.abs(s.avgChange||0)*12)}%`}}/></span><span className="num" style={{color:candleColor(s.avgChange)}}>{signed(s.avgChange)}</span><span className="muted tiny">{s.advancers}/{s.valid} 有效樣本上漲</span></div>)}</div>
+  </Panel><Panel title="族群明細" subtitle="點選產業列，可展開該產業的成分股"><DataGrid rows={groups} onRow={r => setActiveSector(prev => prev === r.name ? null : r.name)} columns={[{key:'name',name:'產業',left:true},{key:'count',name:'母體檔數'}, {key:'valid',name:'有效檔數'}, {key:'avgChange',name:'等權漲跌',render:r=><Percent value={r.avgChange}/>},{key:'capWeighted',name:'市值加權',render:r=><Percent value={r.capWeighted}/>}]} />
       {activeSector && <div className="sector-members"><h3>{activeSector} · 成分股</h3><DataGrid rows={groups.find(g=>g.name===activeSector)?.stocks || []} columns={stockCols} onRow={onStock}/></div>}
       <div className="tip">目前母體：{signals.latest.length} 檔。完整市場需要涵蓋所有符合資格的標的及正確產業分類。</div>
   </Panel></>;
@@ -381,12 +379,13 @@ const STATUS_NAMES={fresh:'日期符合',stale:'資料落後',error:'更新失�
 function HealthView({market}){
   return <><Panel title="資料健康與來源" subtitle="每個來源獨立記錄資料日及更新結果；重新產檔不會改寫行情日期。">
     <div className="health-grid">{Object.entries(market.sources||{}).map(([key,s])=>{
-      const status=key==='calendar'?s.status:effectiveStatus(s,market.calendar);
+      const status=key==='calendar'?s.status:effectiveStatus(s,key.startsWith('tpex')?null:market.calendar);
       return <article className="source-card" key={key}><div><b>{s.name||key}</b><Pill tone={status==='fresh'?'good':['stale','error'].includes(status)?'danger':'warn'}>{STATUS_NAMES[status]||status}</Pill></div>
         <p>{key==='calendar'?'日曆涵蓋至':'資料日'} <strong>{s.asOf||'—'}</strong>　·　{s.rowCount??'—'} 筆</p>
-        <p>成功抓取：{s.fetchedAt?.replace('T',' ')||'尚無成功紀錄'}</p>
+        <p>快照首次抓取：{s.fetchedAt?.replace('T',' ')||'尚無成功紀錄'}</p>
+        {s.lastAttemptAt&&<p>最近檢查：{s.lastAttemptAt.replace('T',' ')}</p>}
         {s.error&&<p className="source-error">{s.error}</p>}{s.reason&&<p>{s.reason}</p>}
-        {s.sha256&&<p>來源摘要：{s.sha256.slice(0,12)}…</p>}
+        {s.sha256&&<p title={s.sha256}>來源摘要：{s.sha256.slice(0,12)}…</p>}
         {s.url&&<a href={s.url} target="_blank" rel="noreferrer">官方來源 ↗</a>}{s.license&&<a href={s.license} target="_blank" rel="noreferrer">授權說明 ↗</a>}
       </article>;
     })}</div>
@@ -428,7 +427,7 @@ export default function Scanner(){
     return()=>{clearTimeout(timer);document.body.style.overflow=prior;document.removeEventListener('keydown',close);previous?.focus?.()};
   },[selected,sourceOpen,menu]);
   const signals=useMemo(()=>getSignals(market,scope,basis),[market,scope,basis]);
-  const viewMarket={...market, stocks:market.stocks.filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,market.asOf)),
+  const viewMarket={...market, asOf:signals.anchor, stocks:market.stocks.filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,signals.anchor)),
     universe:`${MARKET_NAMES[scope]} · ${BASIS_NAMES[basis]} · 當期普通股名單，非歷史成員回測`,
     sources:scope==='TPEx'?{...market.sources,institutional:market.sources.tpexInstitutional||{status:'unavailable',reason:'TPEx 法人資料尚未載入'}}:market.sources,
     institutionalSessions:scope==='TPEx'?(market.research?.markets?.TPEx?.institutionalSessions||[]):market.institutionalSessions};
@@ -491,6 +490,8 @@ export default function Scanner(){
           <div className="filters"><label>市場母體 <select aria-label="市場母體" value={scope} onChange={e=>{setScope(e.target.value);setSelected(null)}}>{Object.entries(MARKET_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
           <label>均線／突破價格基礎 <select aria-label="均線／突破價格基礎" value={basis} onChange={e=>{setBasis(e.target.value);setSelected(null)}}>{Object.entries(BASIS_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
           <p>{MARKET_NAMES[scope]}普通股 {signals.coverage.total} 檔 · 同日未還原價 {signals.coverage.quotes} / {signals.coverage.total}（{format(signals.coverage.quotePct,1)}%）· 經驗證還原價 {signals.coverage.adjusted} 檔</p>
+          <p>同日原價未涵蓋 {signals.coverage.total-signals.coverage.quotes} 檔；缺價、來源日期不同或原因未確認，不推定為停牌。</p>
+          <p className="daily-breadth">行情日 {signals.daily.date||"—"} · {signals.daily.available?`上漲 ${signals.daily.up} ／ 下跌 ${signals.daily.down} ／ 平盤 ${signals.daily.flat}`:signals.daily.datesAligned?"0 檔具備可判定漲跌資料":"上市櫃日期不一致，合併漲跌暫不計算"} · 可判定 {signals.daily.eligible}/{signals.daily.total} 檔</p>
           <p>已觀測有效價格 {signals.coverage.minDays}–{signals.coverage.maxDays} 日／目標約 300 交易日；不代表連續完整日曆。</p>
           <p>完整 MA20／60／120／240：{[20,60,120,240].map(n=>signals.coverage.ma[n]).join('／')} 檔 · 可判定240日突破 {signals.coverage.breakout240} 檔</p>
           <p>{BASIS_NAMES[basis]} · {basis==='adjusted'?'尚無經驗證還原價時保持缺資料，不改用原價。':'均線為暫行研究；未還原突破須完整事件覆蓋且窗口無除權息／資本事件。'}</p>
