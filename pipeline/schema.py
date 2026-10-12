@@ -69,9 +69,9 @@ def validate(payload, now=None):
     seen = set()
     for stock in payload['stocks']:
         symbol = stock['symbol']
-        if not isinstance(symbol, str) or not re.fullmatch('[0-9]{4}', symbol) or symbol in seen or not isinstance(stock.get('name'), str):
+        if not isinstance(symbol, str) or not re.fullmatch('[0-9]{4}', symbol) or (stock.get('market','TWSE'),symbol) in seen or not isinstance(stock.get('name'), str):
             raise ValueError('Invalid/duplicate symbol')
-        seen.add(symbol)
+        seen.add((stock.get('market','TWSE'),symbol))
         ordered(stock['history'], ('close', 'volumeShares', 'changeAmount'), ('close',))
         if any(r.get('volumeShares') is not None and r['volumeShares'] < 0 for r in stock['history']):
             raise ValueError('Negative volume')
@@ -111,7 +111,7 @@ def validate(payload, now=None):
                 url = urlparse(source[field])
                 if url.scheme != 'https' or not url.hostname or url.username or url.password:
                     raise ValueError('Credential-free source HTTPS URLs required')
-    if payload['mode'] == 'live' and (not payload['stocks'] or payload['sources'].get('quotes', {}).get('asOf') != as_of or not re.fullmatch('[a-f0-9]{64}', payload['sources'].get('quotes', {}).get('sha256') or '')):
+    if payload['mode'] == 'live' and (not payload['stocks'] or max((payload['sources'].get(k, {}).get('asOf') or '' for k in ('quotes','tpexQuotes'))) != as_of or not re.fullmatch('[a-f0-9]{64}', payload['sources'].get('quotes', {}).get('sha256') or '')):
         raise ValueError('live requires stock observations and source digest')
     def bounded(rows, module, modules=None):
         source_day = max((payload['sources'].get(key, {}).get('asOf') or '' for key in (modules or [module])), default='')
@@ -121,7 +121,7 @@ def validate(payload, now=None):
     bounded(payload['futures'], 'futures')
     bounded(payload['creditHistory'], 'credit')
     for stock in payload['stocks']:
-        bounded(stock.get('institutional', []), 'institutional')
+        bounded(stock.get('institutional', []), 'tpexInstitutional' if stock.get('market')=='TPEx' else 'institutional')
         bounded([stock['margin']] if stock.get('margin') else [], 'margin')
     if payload.get('quoteSessions') is not None:
         if not isinstance(payload['quoteSessions'], list):
@@ -129,4 +129,7 @@ def validate(payload, now=None):
         ordered([{'date': d} for d in payload['quoteSessions']])
         if any(not as_of or d > as_of for d in payload['quoteSessions']):
             raise ValueError('Quote session newer than asOf')
+    if 'researchVersion' in payload:
+        from .research import validate_research
+        validate_research(payload)
     return payload

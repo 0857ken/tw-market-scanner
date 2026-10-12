@@ -15,6 +15,8 @@ from .common import ROOT, TPE, LICENSE, get_json, calendar_rows, expected_sessio
 from .schema import validate, valid_number
 
 SOURCES = {
+    'tpexCompanies': ('TPEx 上櫃公司基本資料', 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap03_O'),
+    'tpexQuotes': ('TPEx 上櫃股票收盤行情', 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes'),
     'companies': ('TWSE 上市公司基本資料', 'https://openapi.twse.com.tw/v1/opendata/t187ap03_L'),
     'quotes': ('TWSE 上市個股日成交資訊', 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'),
     'index': ('TWSE 發行量加權股價指數', 'https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX'),
@@ -227,6 +229,8 @@ def run(data_dir=ROOT / 'data', strict=False, credit_file=None, now=None):
     calendar = cal['rows'] if cal else []
     collect(data_dir, sources, 'companies', parsers.companies, now)
     q = collect(data_dir, sources, 'quotes', parsers.quotes, now)
+    collect(data_dir, sources, 'tpexCompanies', parsers.tpex_companies, now)
+    collect(data_dir, sources, 'tpexQuotes', parsers.tpex_quotes, now)
     collect(data_dir, sources, 'index', parsers.index, now)
     collect(data_dir, sources, 'indexHistory', parsers.index_history, now)
     if q:
@@ -241,13 +245,15 @@ def run(data_dir=ROOT / 'data', strict=False, credit_file=None, now=None):
     try:
         credit = import_credit(credit_file, sources, now)
         payload = build(data_dir, sources, calendar, credit, now)
+        from .research import integrate
+        payload = integrate(payload, data_dir)
         validate(payload)
     except Exception as exc:
         return record_failure(data_dir, now, exc)
     report = {'generatedAt': payload['generatedAt'], 'asOf': payload['asOf'], 'mode': payload['mode'],
               'stockCount': len(payload['stocks']), 'quoteDays': len(payload['quoteSessions']),
               'sources': payload['sources'], 'warnings': ['信用燈號原始規則待確認', 'T86 公開轉載授權待核實，預設停用', '未還原價格，非含息績效或回測'],
-              'freshCritical': all(sources.get(k, {}).get('status') == 'fresh' for k in ('quotes', 'companies'))}
+              'freshCritical': all(sources.get(k, {}).get('status') == 'fresh' for k in ('quotes', 'companies', 'tpexQuotes', 'tpexCompanies'))}
     # Validation precedes the single atomic market replacement. A failure never falsifies observation dates.
     write_json(data_dir / 'market.json', payload)
     write_json(data_dir / 'quality.json', report)

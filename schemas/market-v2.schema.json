@@ -142,6 +142,60 @@
           "const": 189
         }
       }
+    },
+    "researchVersion": {
+      "const": 1
+    },
+    "research": {
+      "type": "object",
+      "required": [
+        "targetSessions",
+        "markets"
+      ],
+      "properties": {
+        "targetSessions": {
+          "const": 300
+        },
+        "markets": {
+          "type": "object",
+          "required": [
+            "TWSE",
+            "TPEx"
+          ],
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "asOf",
+              "sessions",
+              "calendarStatus",
+              "targetSessions"
+            ],
+            "properties": {
+              "asOf": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "sessions": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "calendarStatus": {
+                "const": "partial"
+              },
+              "targetSessions": {
+                "const": 300
+              }
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -175,6 +229,35 @@
           "type": [
             "number",
             "null"
+          ]
+        },
+        "rawClose": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "adjustedClose": {
+          "type": "null"
+        },
+        "adjustmentVersion": {
+          "type": "null"
+        },
+        "source": {
+          "enum": [
+            "quotes",
+            "tpexQuotes"
+          ]
+        },
+        "sourceVersion": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "market": {
+          "enum": [
+            "TWSE",
+            "TPEx"
           ]
         }
       }
@@ -220,6 +303,111 @@
         },
         "margin": {
           "$ref": "#/$defs/margin"
+        },
+        "market": {
+          "enum": [
+            "TWSE",
+            "TPEx"
+          ]
+        },
+        "securityId": {
+          "type": "string",
+          "pattern": "^(TWSE|TPEx):[0-9]{4}$"
+        },
+        "securityType": {
+          "const": "ordinary"
+        },
+        "lifecycle": {
+          "type": "object",
+          "required": [
+            "listedOn",
+            "delistedOn",
+            "suspensions",
+            "pointInTimeVerified",
+            "source",
+            "rosterAsOf",
+            "status"
+          ],
+          "properties": {
+            "listedOn": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "delistedOn": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "suspensions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "to": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date"
+                  }
+                }
+              }
+            },
+            "pointInTimeVerified": {
+              "const": false
+            },
+            "status": {
+              "const": "current-roster-only"
+            }
+          }
+        },
+        "adjustment": {
+          "type": "object",
+          "required": [
+            "status",
+            "method",
+            "version"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "method": {
+              "type": "null"
+            },
+            "version": {
+              "type": "null"
+            }
+          }
+        },
+        "eventCoverage": {
+          "type": "object",
+          "required": [
+            "status",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown"
+            }
+          }
+        },
+        "events": {
+          "type": "array"
         }
       }
     },
@@ -343,5 +531,48 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "researchVersion"
+        ]
+      },
+      "then": {
+        "required": [
+          "research"
+        ],
+        "properties": {
+          "stocks": {
+            "items": {
+              "required": [
+                "market",
+                "securityId",
+                "securityType",
+                "lifecycle",
+                "adjustment",
+                "events",
+                "eventCoverage"
+              ],
+              "properties": {
+                "history": {
+                  "items": {
+                    "required": [
+                      "rawClose",
+                      "adjustedClose",
+                      "adjustmentVersion",
+                      "source",
+                      "sourceVersion",
+                      "market"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

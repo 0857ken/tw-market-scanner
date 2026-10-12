@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 TPE = ZoneInfo('Asia/Taipei')
 LICENSE = 'https://data.gov.tw/license'
-ALLOWED_HOSTS = {'openapi.twse.com.tw', 'www.twse.com.tw', 'openapi.taifex.com.tw'}
+ALLOWED_HOSTS = {'openapi.twse.com.tw', 'www.twse.com.tw', 'openapi.taifex.com.tw', 'www.tpex.org.tw'}
 
 
 def number(value):

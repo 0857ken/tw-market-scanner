@@ -1,3 +1,4 @@
+import {validateResearch} from './research.js';
 import { numeric, round } from './logic.js';
 const NAMES = [
  ['2330','台積電','半導體',2000],['2317','鴻海','電子代工',600],['2454','聯發科','半導體',750],['2308','台達電','電子零組件',390],
@@ -78,8 +79,8 @@ export function validateMarket(payload, now=new Date()) {
   if(!Array.isArray(payload.stocks)||!payload.sources||typeof payload.sources!=='object'||Array.isArray(payload.sources)) throw new Error('需要 stocks 及逐模組 sources');
   const seen=new Set();
   for(const stock of payload.stocks){
-    if(typeof stock.symbol!=='string'||!/^\d{4}$/.test(stock.symbol)||seen.has(stock.symbol)||typeof stock.name!=='string') throw new Error('股票代號/名稱錯誤或重複');
-    seen.add(stock.symbol);
+    if(typeof stock.symbol!=='string'||!/^\d{4}$/.test(stock.symbol)||seen.has(`${stock.market||'TWSE'}:${stock.symbol}`)||typeof stock.name!=='string') throw new Error('股票代號/名稱錯誤或重複');
+    seen.add(`${stock.market||'TWSE'}:${stock.symbol}`);
     history(stock.history,['close','volumeShares','changeAmount'],stock.symbol,['close']);
     if(stock.history.some(r=>r.date>payload.asOf||r.volumeShares!=null&&r.volumeShares<0)) throw new Error('股票日期或成交量不合法');
     history(stock.institutional||[],['foreignShares','trustShares','dealerShares','totalShares'],`${stock.symbol} 法人`);
@@ -101,16 +102,17 @@ export function validateMarket(payload, now=new Date()) {
     if(key!=='calendar'&&source.asOf>ceiling) throw new Error('來源資料日不能在未來');
     for(const k of ['url','license']) if(source[k]){try{const u=new URL(source[k]);if(u.protocol!=='https:'||u.username||u.password)throw new Error();}catch{throw new Error('來源及授權連結須為無憑證 HTTPS')}}
   }
-  if(payload.mode==='live'&&(!isDate(payload.asOf)||!payload.stocks.length||payload.sources.quotes?.asOf!==payload.asOf||!/^([a-f0-9]{64})$/.test(payload.sources.quotes?.sha256||''))) throw new Error('live 需要可追溯的正式價量快照，不能把 DEMO 換標籤');
+  if(payload.mode==='live'&&(!isDate(payload.asOf)||!payload.stocks.length||[payload.sources.quotes?.asOf||'',payload.sources.tpexQuotes?.asOf||''].sort().at(-1)!==payload.asOf||!/^([a-f0-9]{64})$/.test(payload.sources.quotes?.sha256||''))) throw new Error('live 需要可追溯的正式價量快照，不能把 DEMO 換標籤');
   if(payload.creditHistory?.length&&payload.sources.credit?.priceBasis!=='adjusted-total-return') throw new Error('信用資料必須明確為還原權息價');
   const bounded=(rows,module,modules=[module])=>{const day=modules.map(key=>payload.sources[key]?.asOf||'').sort().at(-1);if(rows.length&&(!day||rows.some(r=>r.date>day)))throw new Error(`${module} 觀測日期超過來源資料日或缺少來源日期`);};
   bounded(payload.indexHistory,'indexHistory',['indexHistory','index']);bounded(payload.futures,'futures');bounded(payload.creditHistory,'credit');
-  for(const stock of payload.stocks){bounded(stock.institutional||[],'institutional');bounded(stock.margin?[stock.margin]:[],'margin');}
+  for(const stock of payload.stocks){bounded(stock.institutional||[],stock.market==='TPEx'?'tpexInstitutional':'institutional');bounded(stock.margin?[stock.margin]:[],'margin');}
   if(payload.quoteSessions!=null){
     if(!Array.isArray(payload.quoteSessions))throw new Error('quoteSessions 必須是陣列');
     history(payload.quoteSessions.map(date=>({date})),[],'交易日');
     if(payload.quoteSessions.some(d=>!payload.asOf||d>payload.asOf))throw new Error('交易日超過價量資料日');
   }
+  if('researchVersion' in payload)validateResearch(payload);
   return payload;
 }
 export async function fetchMarket(url) {

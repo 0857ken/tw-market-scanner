@@ -1,5 +1,5 @@
 {
-  "reviewedAt": "2026-10-08",
+  "reviewedAt": "2026-10-12",
   "license": "https://data.gov.tw/license",
   "modules": {
     "companies": {
@@ -47,6 +47,26 @@
       "status": "pending",
       "evidence": "https://ranaroussi.github.io/yfinance/",
       "note": "未取得可公開轉載的 HYG/SHY/SPY 還原價，預設停用。"
+    },
+    "tpexCompanies": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/dataset/25036",
+      "note": "上櫃公司基本資料；公開僅保留代號、名稱、產業、股數及日期，不輸出個人或聯絡資料。"
+    },
+    "tpexQuotes": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/dataset/11371",
+      "note": "上櫃收盤行情最新快照；不構成歷史批量端點授權。"
+    },
+    "tpexEvents": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/dataset/11633",
+      "note": "除權息參考價，不是總報酬還原因子；不代表完整歷史事件覆蓋。"
+    },
+    "tpexInstitutional": {
+      "status": "verified-open-data",
+      "evidence": "https://data.gov.tw/dataset/11856",
+      "note": "只限TPEx上櫃，不能延伸為TWSE T86授權。"
     }
   }
 }

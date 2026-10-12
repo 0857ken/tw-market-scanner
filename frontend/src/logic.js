@@ -1,3 +1,4 @@
+import {researchMetrics,researchBreadth,marketMeta,memberOn,coverage} from './research.js';
 // Pure calculations, shared by UI and tests. No invented current readings.
 export const CREDIT = Object.freeze({ window: 189, status: 'pending', greenBelow: null, redAtOrAbove: null, positionBelow: null });
 export const COLORS = Object.freeze({ red: '#fb6373', green: '#2ec995', yellow: '#f2b84b', blue: '#78a9ff' });
@@ -118,11 +119,11 @@ export function institutionalStreak(rows, key, sessions = []) {
   }
   return { direction: sign, days, shares };
 }
-export function getSignals(market) {
-  const stocks = market?.stocks || [];
-  const latest = stocks.map(s=>stockMetrics(s,market.quoteSessions||[]));
+export function getSignals(market, scope='ALL', basis='adjusted') {
+  const stocks = (market?.stocks || []).filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,market.asOf));
+  const latest = stocks.map(s=>{const meta=marketMeta(market,s.market||'TWSE');return {...stockMetrics(s,[...new Set([...(meta.sessions||[]),...(market.asOf?[market.asOf]:[])])].sort()),...researchMetrics(s,meta,basis,market.asOf)};});
   const dates = [...new Set(stocks.flatMap(s => (s.history || []).map(x => x.date)))].sort().slice(-120);
-  const breadth = computeBreadth(stocks, dates, market.quoteSessions||[]);
+  const breadth = researchBreadth(stocks, market, basis, [...new Set([...dates,...(market.asOf?[market.asOf]:[])])].sort());
   const credit = computeCredit(market.creditHistory || [], CREDIT.window, market.creditRule || CREDIT);
   const creditNow = credit.at(-1);
   const futures = (market.futures || []).at(-1);
@@ -138,5 +139,5 @@ export function getSignals(market) {
   if (numeric(futures?.foreign) && futures.foreign < -15000) alerts.push({ level: 'warn', page: '期貨籌碼', msg: `外資期貨淨部位 ${format(futures.foreign)} 口；需連同選擇權及避險部位判讀` });
   const marginRisk = latest.filter(s => numeric(s.margin?.usagePct) && s.margin.usagePct >= 80);
   if (marginRisk.length) alerts.push({ level: 'warn', page: '融資水位', msg: `${marginRisk.length} 檔達到自訂融資使用率觀察門檻 80%（非斷頭保證）` });
-  return { latest, dates, breadth, credit, creditNow, regime, futures, hits, breakoutEligible, marginRisk, alerts };
+  return { scope, basis, coverage:coverage(stocks,market,basis,market.asOf), latest, dates, breadth, credit, creditNow, regime, futures, hits, breakoutEligible, marginRisk, alerts };
 }

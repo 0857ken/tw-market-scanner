@@ -90,3 +90,28 @@ test('missing calendar marks freshness unknown and forged credit approval is rej
   await expect(page.locator('.data-banner')).toContainText(market.asOf);
   await go(page,'信用利差');await expect(page.locator('.credit-light')).toContainText('規則待確認');
 });
+
+const integrated=JSON.parse(fs.readFileSync(new URL('../../data/market.json',import.meta.url),'utf8'));
+for(const width of [320,390,1440])test(`Stage3B ${width}px markets, basis, coverage and institutional scope`,async({page})=>{
+  await page.setViewportSize({width,height:844});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/market.json',route=>route.fulfill({json:integrated}));
+  await page.goto('./');await expect(page.locator('.data-banner')).toContainText(integrated.asOf);
+  const panel=page.getByRole('region',{name:'研究母體與資料覆蓋'});
+  await expect(panel).toContainText('經驗證還原價 0 檔');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('TPEx');
+  await expect(panel).toContainText('上櫃普通股');
+  await page.getByLabel('均線／突破價格基礎',{exact:true}).selectOption('raw');
+  await expect(panel).toContainText('未還原價（暫行研究）');
+  await go(page,'市場廣度');await expect(page.locator('.metric').filter({hasText:'站上 MA240'})).toContainText('—');
+  await go(page,'高點突破');await page.getByRole('button',{name:'240',exact:true}).click();
+  await expect(page.locator('.section-subtitle')).toContainText('暖機中');
+  await go(page,'法人買賣超');await expect(page.locator('main')).not.toContainText('法人買賣超尚未接入');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('TWSE');
+  await expect(page.locator('main')).toContainText('法人買賣超尚未接入');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('ALL');
+  await expect(panel).toContainText('上市櫃合併普通股');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  expect(errors).toEqual([]);
+  if(width===390)await page.screenshot({path:'../test-results/stage3b-mobile.png',fullPage:true});
+});

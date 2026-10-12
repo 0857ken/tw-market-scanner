@@ -53,3 +53,7 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 `START_HERE.md`、`WORK_TASK.md`、`docs/INTEGRATION_RISKS.md` 是原始交接指令。原 `data-pipeline/` 與巢狀 workflows 已在此分支整合移除；原始版本仍保存在 Git baseline。以本 README 與驗收紀錄判斷現在狀態。
 
 **額外月費目標 NT$0；本次付費項目為零。** 自動更新與 Pages 預設關閉，僅允許指定公開 repo 的標準 Ubuntu runner；公開建庫及正式網站發布各需使用者明確核准。
+
+## Stage 3B（2026-10-12）
+
+上市／上櫃／合併普通股母體與雙價格欄位已整合，預設經驗證還原價；目前還原價為空、歷史仍不足。未還原突破會受完整事件／交易日驗證門檻保護。詳見 [Stage 3B 稽核、授權、覆蓋率與限制](docs/STAGE3B_AUDIT.md)。此階段未合併或部署，未啟用排程。
