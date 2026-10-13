@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
+  publicDir: process.env.VITE_RELEASE_PROFILE==='observation-only'?false:'public',
   plugins: [{
     name: 'local-dev-policy',
     apply: 'serve',

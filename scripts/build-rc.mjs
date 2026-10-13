@@ -14,15 +14,10 @@ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'scanner-observation-'));
 function run(command,args,options={}){const result=spawnSync(command,args,{stdio:'inherit',...options});if(result.status!==0)throw new Error(`${command} failed (${result.status})`);}
 run(process.env.PYTHON||'python3',['-m','pipeline.observation_release','--output',temporary]);
 const report=JSON.parse(fs.readFileSync(path.join(temporary,'observation-report.json')));
-const publicFile=path.join(root,'frontend/public/market.json');
-const original=fs.existsSync(publicFile)?fs.readFileSync(publicFile):null;
-try {
-  fs.copyFileSync(path.join(temporary,'market.json'),publicFile);
-  run(process.execPath,['node_modules/vite/bin/vite.js','build','--outDir','dist-rc'],{cwd:path.join(root,'frontend'),env:{...process.env,VITE_RELEASE_PROFILE:'observation-only',VITE_MARKET_URL:'',VITE_APPROVED_DATA_SHA256:report.publishedDataSha256,VITE_RC_COMMIT:commit}});
-} finally {
-  if(original)fs.writeFileSync(publicFile,original);else fs.unlinkSync(publicFile);
-}
+run(process.execPath,['node_modules/vite/bin/vite.js','build','--outDir','dist-rc'],{cwd:path.join(root,'frontend'),env:{...process.env,VITE_RELEASE_PROFILE:'observation-only',VITE_MARKET_URL:'',VITE_APPROVED_DATA_SHA256:report.publishedDataSha256,VITE_RC_COMMIT:commit}});
 const dist=path.join(root,'frontend/dist-rc');
+fs.copyFileSync(path.join(temporary,'market.json'),path.join(dist,'market.json'));
+fs.writeFileSync(path.join(dist,'.nojekyll'),'');
 const sha=body=>crypto.createHash('sha256').update(body).digest('hex');
 assert.equal(sha(fs.readFileSync(path.join(dist,'market.json'))),report.publishedDataSha256);
 const html=fs.readFileSync(path.join(dist,'index.html'),'utf8');

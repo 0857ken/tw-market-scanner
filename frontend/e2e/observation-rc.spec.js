@@ -6,6 +6,7 @@ async function go(page,name){
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
   await page.locator('.sidebar .nav-item').filter({hasText:new RegExp(`^${name}$`)}).click();
   await expect(page.locator('.page-top h1')).toHaveText(name);
+  if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
 }
 for(const width of [320,390,1440])test(`${width}px: pinned observation RC assets, features and scope`,async({page})=>{
   await page.setViewportSize({width,height:844});
@@ -35,6 +36,8 @@ for(const width of [320,390,1440])test(`${width}px: pinned observation RC assets
   await page.screenshot({path:`../test-results/stage4a-${width}-disabled.png`,fullPage:true});
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
   await page.locator('.nav-home').click();
+  if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
+  await expect(page.locator('.page-top h1')).toHaveText('市場總覽');
   await page.screenshot({path:`../test-results/stage4a-${width}-home.png`,fullPage:true});
 });
 test('failed refresh and mismatched cached data retain last approved version',async({page})=>{

@@ -10,6 +10,8 @@
 
 前端驗證資料位元組 SHA256（Web Crypto，需 HTTPS 或 localhost）。不符、缺檔、HTTP 失敗均不能覆蓋已載入核准版本；首次失敗保持缺資料。JSON 以 no-store 讀取，沒有 Service Worker、DEMO／匯入入口或外部資料 fallback。CSP connect-src 僅 self；Vite 使用相對路徑、資源內容 hash 與 `.nojekyll`。Meta CSP 不等於 Pages 回應標頭驗證。
 
+RC 不直接複製 public 資料夾，避免納入 `market.example.json` 或其他未核准檔；只加入已驗證投影和 `.nojekyll`，另以資源白名單檢查候選包。手機驗收截圖會等待選單關閉動畫完成。
+
 ## 固定資料版本
 
 | 項目 | 候選值 |
