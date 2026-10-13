@@ -19,3 +19,4 @@ html{overflow-x:clip}body{min-width:320px}a{color:#a2c4ff}button:focus-visible,i
 .coverage-panel{padding:14px 16px;margin:12px 0 20px;border:1px solid #2d3c52;border-radius:14px;background:#111c2d;min-width:0}.coverage-panel p{font-size:12px;line-height:1.7;color:#b4c4da;overflow-wrap:anywhere;margin:6px 0}.coverage-panel .filters{display:flex;flex-wrap:wrap;gap:12px}.coverage-panel label{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;max-width:100%}.coverage-panel select{max-width:100%;min-width:0;color:#dce5f4;background:#17263b;border:1px solid #35465e;border-radius:6px;padding:7px}
 
 .coverage-details{margin-top:8px}.coverage-details summary{cursor:pointer;color:#9edbef;font-size:12px;min-height:30px;line-height:30px}.coverage-details[open] summary{margin-bottom:6px}
+:root .rc-version {overflow-wrap:anywhere;}

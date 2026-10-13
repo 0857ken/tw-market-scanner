@@ -1,52 +1,46 @@
-name: Approved GitHub Pages release
+# Stage 4A has NO Pages permissions or deployment jobs.
+# Stage 4B requires explicit approval and a reviewed publication change.
+name: Manual observation candidate - publication disabled
 on:
   workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact 40-character reviewed commit SHA (candidate only)
+        required: true
+        type: string
 permissions:
   contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: scanner-pages
-  cancel-in-progress: true
 jobs:
-  build:
-    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false && github.ref == 'refs/heads/main' && vars.PAGES_RELEASE_APPROVED == 'true'
+  candidate:
+    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Validate immutable candidate reference
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
       - uses: actions/checkout@v7
         with:
-          ref: main
-          fetch-depth: 0
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Overlay verified data without modifying main
-        run: |
-          git fetch origin market-data
-          git restore --source origin/market-data --worktree -- data
-          python -m pipeline.release_check
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
       - run: npm ci --prefix frontend --no-audit --no-fund
       - run: npm test
-      - run: npm run build
+      - run: npm run build:rc
         env:
-          VITE_MARKET_URL: https://raw.githubusercontent.com/0857ken/tw-market-scanner/market-data/data/market.json
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+          RC_COMMIT_SHA: ${{ inputs.candidate_sha }}
+      - uses: actions/upload-artifact@v7.0.2
+      # No Pages publication here, including manually dispatched runs.
         with:
-          path: frontend/dist
-          retention-days: 1
-  deploy:
-    needs: build
-    runs-on: ubuntu-24.04
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          name: observation-rc-${{ inputs.candidate_sha }}
+          path: frontend/dist-rc/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error

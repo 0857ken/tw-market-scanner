@@ -6,6 +6,10 @@ export default defineConfig({
     apply: 'serve',
     // Local Vite HMR needs inline bootstrap and WebSockets; built output keeps CSP.
     transformIndexHtml: html => html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*\/>/, ''),
+  },{
+    name:'observation-only-policy',
+    apply:'build',
+    transformIndexHtml:html=>process.env.VITE_RELEASE_PROFILE==='observation-only'?html.replace("connect-src 'self' https://raw.githubusercontent.com;","connect-src 'self';"):html,
   }],
   build: {
     rollupOptions: {

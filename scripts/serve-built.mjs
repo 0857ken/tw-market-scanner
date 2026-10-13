@@ -3,7 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../frontend/dist');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),process.env.SCANNER_RC==='true'?'../frontend/dist-rc':'../frontend/dist');
 const prefix='/tw-market-scanner/';
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml'};
 http.createServer((req,res)=>{

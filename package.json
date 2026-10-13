@@ -11,6 +11,8 @@
     "build": "node scripts/prepare-data.mjs && npm run build --prefix frontend",
     "dev": "node scripts/prepare-data.mjs && npm run dev --prefix frontend",
     "preview": "node scripts/serve-built.mjs",
-    "test:e2e": "npm run test:e2e --prefix frontend"
+    "test:e2e": "npm run test:e2e --prefix frontend",
+    "build:rc": "node scripts/build-rc.mjs",
+    "test:rc:e2e": "cd frontend && node node_modules/@playwright/test/cli.js test --config playwright.rc.config.js"
   }
 }
