@@ -147,9 +147,12 @@ test('Stage3D real static artifact, mobile modules, source details and performan
   await page.locator('.coverage-details summary').click();await expect(page.getByRole('region',{name:'研究母體與資料覆蓋'})).toContainText('檔案產生');
   await go(page,'資料健康');await expect(page.locator('main')).toContainText('快照首次抓取');await expect(page.locator('main')).toContainText('最近檢查');
   await page.getByLabel('市場母體',{exact:true}).selectOption('TPEx');
+  await page.locator('.coverage-details summary').click();
   await go(page,'法人買賣超');await expect(page.locator('tbody').first()).toBeVisible();
+  await page.locator('main .panel').first().evaluate(e=>{e.scrollIntoView({block:'start'});window.scrollBy(0,-70)});
   await page.screenshot({path:'../test-results/stage3d-tpex.png',fullPage:false});
   await go(page,'台股熱力圖');await expect(page.locator('.recharts-wrapper').first()).toBeVisible();
+  await page.locator('main .panel').first().evaluate(e=>{e.scrollIntoView({block:'start'});window.scrollBy(0,-70)});
   await page.screenshot({path:'../test-results/stage3d-heatmap.png',fullPage:false});
   await go(page,'產業輪動');await expect(page.locator('main')).toContainText('有效檔數');
   await page.getByLabel('市場母體',{exact:true}).selectOption('ALL');
