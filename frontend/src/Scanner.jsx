@@ -193,11 +193,11 @@ function RegimeView({ market, signals }) {
 }
 const US_DEMO = [ ['NVDA','輝達',13,4.5],['MSFT','微軟',12,0.8],['AAPL','蘋果',11,-0.8],['GOOGL','Alphabet',9,1.5],['AMZN','亞馬遜',8,-1.2],['META','Meta',7,2.7],['AVGO','博通',5,3.1],['TSLA','特斯拉',5,-2.3],['JPM','摩根大通',4,0.1],['AMD','超微',4,1.9],['WMT','沃爾瑪',4,-0.2],['V','Visa',3,0.9] ];
 function HeatContent(props) {
-  const { x, y, width, height, symbol, name, change, marketStyle } = props;
-  if (width < 12 || height < 10) return null;
+  const { x, y, width, height, symbol, name, change, marketStyle, securityId, openStock } = props;
+  if (!symbol || !numeric(change)) return null;
   const rise = (change || 0) > 0, mag = Math.min(1,Math.abs(change || 0)/5);
   const rgb = change === 0 ? 'rgba(110,136,166,.4)' : marketStyle === 'tw' ? (rise ? `rgba(251,99,115,${.28 + mag*.65})`:`rgba(46,201,149,${.25 + mag*.65})`) : (rise ? `rgba(46,201,149,${.25+mag*.65})`:`rgba(251,99,115,${.28+mag*.65})`);
-  return <g><rect x={x} y={y} width={width} height={height} fill={rgb} stroke="#08111e" strokeWidth={2} rx={5}/>
+  return <g data-security-id={securityId} role={openStock?"button":undefined} tabIndex={openStock?0:undefined} aria-label={`${symbol} ${name} ${signed(change)}`} onClick={()=>openStock?.(securityId)} onKeyDown={e=>{if(openStock&&["Enter"," "].includes(e.key)){e.preventDefault();openStock(securityId)}}}><rect x={x} y={y} width={width} height={height} fill={rgb} stroke="#08111e" strokeWidth={(width<12||height<10)?0.25:2} rx={width<12||height<10?0:5}/>
     {width > 55 && height > 31 && <><text x={x+width/2} y={y+height/2 - 6} fill="#fff" fontSize={width>110 ? 15:12} fontWeight="700" textAnchor="middle">{symbol}</text><text x={x+width/2} y={y+height/2+11} fill="#fff" fontSize="11" textAnchor="middle">{signed(change)}</text></>}
     {width>125 && height>72 && <text x={x+width/2} y={y+height/2+28} fill="#e4edee" fontSize="10" textAnchor="middle">{name}</text>}
   </g>;
@@ -209,12 +209,12 @@ function Heatmap({ market, signals, us, onStock }) {
   const filtered = raw.filter(r => sector === '全部' || (r.sector || '未分類') === sector);
   const ranked = filtered.filter(r=>numeric(r.change)).sort((a,b) => rank === '漲跌幅' ? (b.change || 0) - (a.change || 0) : (b.marketCapM || 0) - (a.marketCapM || 0));
   const useCap=ranked.every(r=>numeric(r.marketCapM)&&r.marketCapM>0);
-  const treemap = ranked.filter(r => numeric(r.change)).map(r => ({ ...r, size: useCap?r.marketCapM:1, marketStyle:tw?'tw':'us' }));
+  const treemap = ranked.filter(r => numeric(r.change)).map(r => ({ ...r, securityId:securityKey(r), size: useCap?r.marketCapM:1, marketStyle:tw?'tw':'us' }));
   const up = treemap.filter(r=>r.change>0).length, down = treemap.filter(r=>r.change<0).length;
   return <><Panel title={tw ? '台股漲跌熱力圖' : '美股觀察池熱力圖'} subtitle={`${tw?'台股紅漲綠跌':'美股綠漲紅跌'} · 全部可用時以官方普通股數×收盤價為市值；缺市值時全母體採等權`} right={<Pill tone={market.mode === 'demo' ? 'warn':'neutral'}>{market.mode === 'demo'?'虛構示範':'匯入資料'}</Pill>}>
     {!tw && <div className="tip"><Info size={14}/> 此頁不是完整 S&P 500 成分股。沒有美股資料時不以台股或隨機行情偽裝完整指數。</div>}
     <div className="filters"><label>產業 <select value={sector} onChange={e=>setSector(e.target.value)}>{sectors.map(v=><option key={v}>{v}</option>)}</select></label><Toggle value={rank} setValue={setRank} options={['市值','漲跌幅']}/><span className="muted tiny">上漲 {up} ／ 下跌 {down}</span></div>
-    {treemap.length ? <div className="heatmap"><ResponsiveContainer width="100%" height="100%"><Treemap data={treemap} dataKey="size" nameKey="symbol" content={<HeatContent/>} isAnimationActive={false}/></ResponsiveContainer></div>
+    {treemap.length ? <div className="heatmap"><ResponsiveContainer width="100%" height="100%"><Treemap data={treemap} dataKey="size" nameKey="symbol" content={<HeatContent openStock={onStock?id=>{const stock=signals.latest.find(s=>securityKey(s)===id);if(stock)onStock(stock)}:undefined}/>} isAnimationActive={false}/></ResponsiveContainer></div>
       : <Empty title="未接入市場資料" detail={us?'匯入資料需包含 usStocks 才會顯示美股行情。':'匯入有效上市櫃個股收盤資料後即可顯示。'}/>}
   </Panel>
   <Panel title="漲跌排行"><DataGrid rows={ranked.slice(0,25)} columns={[nameCol,changeCol,{key:'sector',name:'產業',render:r=>r.sector || '—'},{key:'marketCapM',name:'市值權重',render:r=>format(r.marketCapM)}]} onRow={tw ? onStock:undefined}/></Panel>

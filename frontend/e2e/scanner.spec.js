@@ -153,6 +153,11 @@ test('Stage3D real static artifact, mobile modules, source details and performan
   await page.screenshot({path:'../test-results/stage3d-tpex.png',fullPage:false});
   await go(page,'台股熱力圖');await expect(page.locator('.recharts-wrapper').first()).toBeVisible();
   await page.locator('main .panel').first().evaluate(e=>{e.scrollIntoView({block:'start'});window.scrollBy(0,-70)});
+  const tiles=page.locator('.heatmap [data-security-id]');
+  const expectedTiles=integrated.stocks.filter(s=>s.market==='TPEx').filter(s=>{const r=s.history.find(r=>r.date===integrated.sources.tpexQuotes.asOf);return r&&r.close>0&&typeof r.changeAmount==='number'&&r.close-r.changeAmount>0;}).length;
+  await expect(tiles).toHaveCount(expectedTiles);
+  const tileId=await tiles.first().getAttribute('data-security-id');await tiles.first().click();
+  await expect(page.getByRole('dialog')).toContainText(tileId.split(':')[1]);await page.keyboard.press('Escape');
   await page.screenshot({path:'../test-results/stage3d-heatmap.png',fullPage:false});
   await go(page,'產業輪動');await expect(page.locator('main')).toContainText('有效檔數');
   await page.getByLabel('市場母體',{exact:true}).selectOption('ALL');
