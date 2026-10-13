@@ -126,3 +126,11 @@ class DailyTests(unittest.TestCase):
         with patch('pipeline.daily.PARSERS',adapters),patch('pipeline.run.get_json',side_effect=fetch) as api,patch('pipeline.daily.fetch_twse_csv',return_value=({},samples['quotes']['sha256'],URL)) as csv:
             self.assertEqual(run_daily(self.root,NOW,twse_current_csv=True),0)
             self.assertEqual(api.call_count,5);csv.assert_called_once()
+
+    def test_preclose_same_day_eod_rejected_for_both_markets(self):
+        def change(s):
+            for module in ('quotes','tpexQuotes'):
+                s[module]['date']='2026-10-12'
+                for r in s[module]['rows']:r['date']='2026-10-12'
+        self.assertEqual(self.replay(change,now=datetime(2026,10,12,12,0,tzinfo=TPE)),2)
+        self.assertEqual(read_json(self.root/'market.json')['sources']['quotes']['asOf'],'2026-10-08')

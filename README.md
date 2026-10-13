@@ -1,8 +1,8 @@
 # 台股掃描器 3.0
 
-獨立 React／Vite 前端與 Python 盤後資料管線，儲存庫為 `0857ken/tw-market-scanner`。Stage 3C 位於 feature 分支與 Draft PR #1，尚未合併或發布網站。不讀取或修改 `txf-tracker`。
+獨立 React／Vite 前端與 Python 盤後資料管線，儲存庫為 `0857ken/tw-market-scanner`。Stage 3D 位於 feature 分支與 Draft PR #1，尚未合併或發布網站。不讀取或修改 `txf-tracker`。
 
-目前母體為 **1,085 檔 TWSE 上市與 893 檔 TPEx 上櫃普通股**，最新行情日為 **2026-10-12**；TWSE公司名單日10/11、TPEx公司名單日10/12。TWSE以資料集11549直接列示的當日CSV驗證，避免OpenAPI延遲。排除 ETF、ETN、權證、TDR 等非普通股。加權指數、TX 法人淨未平倉與融資各有獨立資料日；產檔日期不代表行情已更新。完整結果與限制見 [Stage 3C 稽核報告](docs/STAGE3C_AUDIT.md)。
+目前母體為 **1,085 檔 TWSE 上市與 893 檔 TPEx 上櫃普通股**，最新行情日為 **2026-10-12**；TWSE公司名單日10/11、TPEx公司名單日10/12。TWSE以資料集11549直接列示的當日CSV驗證，避免OpenAPI延遲。排除 ETF、ETN、權證、TDR 等非普通股。加權指數、TX 法人淨未平倉與融資各有獨立資料日；產檔日期不代表行情已更新。完整結果與限制見 [Stage 3D 驗收報告](docs/STAGE3D_AUDIT.md)。
 
 ## 執行
 
@@ -70,3 +70,9 @@ python -m pipeline.daily --data-dir /path/to/isolated-data --twse-current-csv
 Stage 3C使用此隔離流程；原 `pipeline.run` 為較廣的舊流程，本階段未用它對外抓取。
 
 [品質報表](data/quality.json) · [更新及CSV來源證據](data/stage3c-update-manifest.json) · [離線重播證據](data/stage3c-replay-evidence.json) · [TWSE詢問信草稿](docs/TWSE_LICENSE_INQUIRY_DRAFT.md) · [TPEx詢問信草稿](docs/TPEX_LICENSE_INQUIRY_DRAFT.md)。兩封信未寄出，歷史批量及價格還原尚未核准。
+
+## Stage 3D：盤後觀察版上線準備
+
+[驗收報告](docs/STAGE3D_AUDIT.md) · [正式上線檢查表與Stage 4流程](docs/OBSERVATION_RELEASE_CHECKLIST.md) · [授權矩陣／官方聯絡窗口](docs/DATA_LICENSE_MATRIX.md)。本階段未發布網站、未合併或寄信。
+
+首頁詳細來源／研究限制可展開；資料重新讀取省略憑證、15秒逾時，僅允許本站／GitHub原始資料URL或匯入JSON。打包保留CSP與相對Pages路徑，CI驗證真實資料資源並提供一天的手機截圖artifact。正式CDN／HTTPS與實機驗收仍須在Stage 4完成；現有完整日曆發布門檻未解除。

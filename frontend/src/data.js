@@ -116,9 +116,16 @@ export function validateMarket(payload, now=new Date()) {
   return payload;
 }
 export async function fetchMarket(url) {
-  const res=await fetch(url,{cache:'no-store'});
-  if(!res.ok) throw new Error(`讀取失敗：HTTP ${res.status}`);
-  return validateMarket(await res.json());
+  const base=globalThis.location?.href||'https://scanner.invalid/';
+  const target=new URL(url,base),sameOrigin=target.origin===new URL(base).origin;
+  if(target.username||target.password||!sameOrigin&&!(target.protocol==='https:'&&target.hostname==='raw.githubusercontent.com'))throw new Error('資料網址僅允許本站或無憑證的 GitHub 原始資料；其他來源請匯入 JSON 檔');
+  target.searchParams.set('scanner_check',String(Date.now()));
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const res=await fetch(target.href,{cache:'no-store',credentials:'omit',signal:controller.signal});
+    if(!res.ok) throw new Error(`讀取失敗：HTTP ${res.status}`);
+    return validateMarket(await res.json());
+  } finally {clearTimeout(timer);}
 }
 
 export function effectiveStatus(source, calendar, now=new Date()) {

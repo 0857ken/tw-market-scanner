@@ -88,7 +88,9 @@ export function validateResearch(payload){
   if(payload.researchVersion!==1||!payload.research?.markets)throw new Error('需要研究資料契約 v1');
   const markets=payload.research.markets;
   if(Object.keys(markets).sort().join(',')!=='TPEx,TWSE')throw new Error('需要上市與上櫃覆蓋紀錄');
-  for(const meta of Object.values(markets)){
+  for(const [exchange,meta] of Object.entries(markets)){
+    const source=payload.sources[exchange==='TWSE'?'quotes':'tpexQuotes'];
+    if(meta.asOf!==source?.asOf||source?.asOf&&!/^[a-f0-9]{64}$/.test(source.sha256||''))throw new Error('市場日期／版本與來源不一致');
     if(meta.targetSessions!==300||meta.calendarStatus!=='partial')throw new Error('交易日曆版本未獨立核准');
     if(!Array.isArray(meta.sessions)||meta.sessions.some((d,i)=>!isoDay(d)||d>payload.asOf||i>0&&d<=meta.sessions[i-1]))throw new Error('市場交易日錯誤');
   }
@@ -106,6 +108,7 @@ export function validateResearch(payload){
     for(const r of s.history){
       if(!Object.hasOwn(r,'rawClose')||r.rawClose!==r.close||r.adjustedClose!==null||r.adjustmentVersion!==null)throw new Error('價格基礎混用或未核准還原價');
       if(r.market!==s.market||r.source!==source||!/^[a-f0-9]{64}$/.test(r.sourceVersion||''))throw new Error('價格版本來源錯誤');
+      if(r.close!==null&&r.date===day&&r.sourceVersion!==payload.sources[source].sha256)throw new Error('最新行情版本與來源不一致');
       if(r.close!==null&&(!day||r.date>day))throw new Error('價格超過所屬市場來源日期');
     }
   }

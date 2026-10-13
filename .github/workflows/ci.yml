@@ -30,5 +30,16 @@ jobs:
       - run: npm ci --prefix frontend --no-audit --no-fund
       - run: npm test
       - run: npm run build
+      - run: node scripts/audit-built.mjs
       - run: npx --prefix frontend playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Save browser acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: scanner-browser-acceptance
+          path: |
+            test-results/*.png
+            test-results/stage3d-*.json
+          retention-days: 1
+          if-no-files-found: warn

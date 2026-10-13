@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from .common import ROOT, read_json, write_json
 
@@ -163,6 +164,10 @@ def validate_research(payload):
     markets = payload['research']['markets']
     if set(markets) != set(MARKETS): raise ValueError('Both market coverage records required')
     for market, meta in markets.items():
+        source = payload['sources'].get(MODULES[market][1], {})
+        digest = source.get('sha256')
+        if meta.get('asOf') != source.get('asOf') or source.get('asOf') and (not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest)):
+            raise ValueError('Market date/version differs from source')
         if meta.get('targetSessions') != 300 or meta.get('calendarStatus') not in ('partial','verified'):
             raise ValueError('Calendar coverage required')
         dates = meta['sessions']
@@ -197,8 +202,9 @@ def validate_research(payload):
         for r in s['history']:
             if 'rawClose' not in r or r['rawClose']!=r['close'] or r.get('adjustedClose') is not None or r.get('adjustmentVersion') is not None:
                 raise ValueError('Mixed or unapproved price basis')
-            if r.get('market')!=s['market'] or r.get('source')!=source or not isinstance(r.get('sourceVersion'),str) or len(r['sourceVersion'])!=64:
+            if r.get('market')!=s['market'] or r.get('source')!=source or not isinstance(r.get('sourceVersion'),str) or not re.fullmatch('[a-f0-9]{64}', r['sourceVersion']):
                 raise ValueError('Price provenance missing')
+            if r['close'] is not None and r['date']==ceiling and r['sourceVersion'] != payload['sources'][source]['sha256']: raise ValueError('Latest price/source version mismatch')
             if r['close'] is not None and (not ceiling or r['date']>ceiling): raise ValueError('Price exceeds market source date')
     return payload
 

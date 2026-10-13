@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const market=JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/official-market-20261007.json',import.meta.url),'utf8'));
 const pages=['資料健康','我的關注','信用利差','市場廣度','市場體制','台股熱力圖','美股熱力圖','高點突破','產業輪動','盤中量能','法人買賣超','連續買賣超','期貨籌碼','融資水位','券商分點','盤前觀察','研究週報','持股水位'];
 async function loaded(page){
-  await page.route('**/market.json',route=>route.fulfill({json:market}));
+  await page.route('**/market.json*',route=>route.fulfill({json:market}));
   await page.goto('./');await expect(page.locator('.data-banner')).toContainText(market.asOf);
 }
 async function go(page,name){
@@ -57,7 +57,7 @@ test('search, stock drawer, local watchlist persistence and table sort',async({p
   expect(dims.scroll).toBeGreaterThanOrEqual(dims.client);
 });
 test('missing default feed stays unavailable and never falls back to DEMO',async({page})=>{
-  await page.route('**/market.json',route=>route.fulfill({status:503,body:'source unavailable'}));
+  await page.route('**/market.json*',route=>route.fulfill({status:503,body:'source unavailable'}));
   await page.goto('./');await expect(page.locator('.global-error')).toContainText('HTTP 503');
   await expect(page.locator('.data-banner')).toContainText('尚未載入');
   await expect(page.locator('.top-mode')).toHaveText('待資料');
@@ -65,7 +65,7 @@ test('missing default feed stays unavailable and never falls back to DEMO',async
 });
 test('failed refresh retains the last observed date and shows the error',async({page})=>{
   await loaded(page);
-  await page.route('**/market.json',route=>route.fulfill({status:503,body:'failure'}));
+  await page.route('**/market.json*',route=>route.fulfill({status:503,body:'failure'}));
   await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
   await expect(page.locator('.global-error')).toContainText('HTTP 503');
   await expect(page.locator('.data-banner')).toContainText(market.asOf);
@@ -82,7 +82,7 @@ test('DEMO is explicit opt-in; relabelled demo file is refused',async({page})=>{
 
 test('missing calendar marks freshness unknown and forged credit approval is rejected',async({page})=>{
   const value=structuredClone(market);delete value.calendar;value.sources.quotes.status='fresh';
-  await page.route('**/market.json',route=>route.fulfill({json:value}));
+  await page.route('**/market.json*',route=>route.fulfill({json:value}));
   await page.goto('./');await expect(page.locator('.data-banner')).toContainText('日期待核對');
   value.creditRule.status='confirmed';
   await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
@@ -95,7 +95,7 @@ const integrated=JSON.parse(fs.readFileSync(new URL('../../data/market.json',imp
 for(const width of [320,390,1440])test(`Stage3B ${width}px markets, basis, coverage and institutional scope`,async({page})=>{
   await page.setViewportSize({width,height:844});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.route('**/market.json',route=>route.fulfill({json:integrated}));
+  await page.route('**/market.json*',route=>route.fulfill({json:integrated}));
   await page.goto('./');await expect(page.locator('.data-banner')).toContainText(integrated.asOf);
   const panel=page.getByRole('region',{name:'研究母體與資料覆蓋'});
   await expect(panel).toContainText('經驗證還原價 0 檔');
@@ -118,7 +118,7 @@ for(const width of [320,390,1440])test(`Stage3B ${width}px markets, basis, cover
 
 test('Stage3C mobile daily dates, separate universes, search and empty eligibility',async({page})=>{
   await page.setViewportSize({width:390,height:844});
-  await page.route('**/market.json',route=>route.fulfill({json:integrated}));
+  await page.route('**/market.json*',route=>route.fulfill({json:integrated}));
   await page.goto('./');await expect(page.locator('.data-banner')).toContainText(integrated.asOf);
   const daily=page.locator('.daily-breadth');
   if(integrated.sources.quotes.asOf!==integrated.sources.tpexQuotes.asOf)await expect(daily).toContainText('上市櫃日期不一致');
@@ -135,4 +135,39 @@ test('Stage3C mobile daily dates, separate universes, search and empty eligibili
   await go(page,'產業輪動');await expect(page.locator('main')).toContainText('有效檔數');
   await go(page,'連續買賣超');await expect(page.locator('main')).toContainText('不以零散快照推定');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
+
+test('Stage3D real static artifact, mobile modules, source details and performance evidence',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const errors=[],bad=[];page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)bad.push({url:r.url(),status:r.status()});});
+  // No mock: verify the real built data file and asset URLs under /tw-market-scanner/.
+  const started=Date.now();await page.goto('./');await expect(page.locator('.data-banner')).toContainText(integrated.asOf);
+  await expect(page.locator('.coverage-details')).not.toHaveAttribute('open','');
+  await page.screenshot({path:'../test-results/stage3d-home.png',fullPage:false});
+  await page.locator('.coverage-details summary').click();await expect(page.getByRole('region',{name:'研究母體與資料覆蓋'})).toContainText('檔案產生');
+  await go(page,'資料健康');await expect(page.locator('main')).toContainText('快照首次抓取');await expect(page.locator('main')).toContainText('最近檢查');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('TPEx');
+  await go(page,'法人買賣超');await expect(page.locator('tbody').first()).toBeVisible();
+  await page.screenshot({path:'../test-results/stage3d-tpex.png',fullPage:false});
+  await go(page,'台股熱力圖');await expect(page.locator('.recharts-wrapper').first()).toBeVisible();
+  await page.screenshot({path:'../test-results/stage3d-heatmap.png',fullPage:false});
+  await go(page,'產業輪動');await expect(page.locator('main')).toContainText('有效檔數');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('ALL');
+  await go(page,'高點突破');await expect(page.locator('main')).toContainText('0 檔具備足夠資料');
+  await go(page,'信用利差');await expect(page.locator('.credit-light')).toContainText('規則待確認');
+  expect(errors).toEqual([]);expect(bad).toEqual([]);
+  const measurements=await page.evaluate(()=>({resources:performance.getEntriesByType('resource').filter(r=>/assets\//.test(r.name)).map(r=>({name:new URL(r.name).pathname,durationMs:Math.round(r.duration),bytes:r.transferSize})),serviceWorkerRegistrations:0}));
+  measurements.serviceWorkerRegistrations=await page.evaluate(async()=>navigator.serviceWorker?(await navigator.serviceWorker.getRegistrations()).length:0);
+  expect(measurements.serviceWorkerRegistrations).toBe(0);
+  fs.writeFileSync('../test-results/stage3d-browser-audit.json',JSON.stringify({viewport:390,asOf:integrated.asOf,scenarioElapsedMs:Date.now()-started,actualDataFile:true,errors,bad,...measurements},null,2));
+});
+
+test('Stage3D mobile mismatched dates suppress combined breadth and refresh retains last valid data',async({page})=>{
+  await page.setViewportSize({width:375,height:812});
+  const p=structuredClone(integrated);p.sources.tpexQuotes.asOf='2026-10-08';p.research.markets.TPEx.asOf='2026-10-08';p.research.markets.TPEx.sessions=['2026-10-08'];p.sources.tpexQuotes.sha256=p.stocks.find(s=>s.market==='TPEx'&&s.history.some(r=>r.date==='2026-10-08'&&r.close>0)).history.find(r=>r.date==='2026-10-08').sourceVersion;
+  for(const s of p.stocks.filter(s=>s.market==='TPEx'))s.history=s.history.filter(r=>r.date<='2026-10-08');
+  await page.route('**/market.json*',r=>r.fulfill({json:p}));await page.goto('./');await expect(page.locator('.daily-breadth')).toContainText('上市櫃日期不一致');
+  await page.getByLabel('市場母體',{exact:true}).selectOption('TPEx');await expect(page.locator('.daily-breadth')).toContainText('2026-10-08');
+  await page.route('**/market.json*',r=>r.fulfill({status:503,body:'controlled failure'}));await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
+  await expect(page.locator('.global-error')).toContainText('HTTP 503');await expect(page.locator('.daily-breadth')).toContainText('2026-10-08');
 });

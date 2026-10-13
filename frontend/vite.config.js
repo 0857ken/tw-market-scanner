@@ -1,6 +1,12 @@
 import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
+  plugins: [{
+    name: 'local-dev-policy',
+    apply: 'serve',
+    // Local Vite HMR needs inline bootstrap and WebSockets; built output keeps CSP.
+    transformIndexHtml: html => html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*\/>/, ''),
+  }],
   build: {
     rollupOptions: {
       output: {

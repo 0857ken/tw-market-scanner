@@ -152,5 +152,51 @@
         ]
       ]
     ]
+  },
+  {
+    "name": "market metadata cannot change its own date",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "research",
+          "markets",
+          "TPEx",
+          "asOf"
+        ],
+        "2026-01-01"
+      ]
+    ]
+  },
+  {
+    "name": "TPEx digest required",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "sources",
+          "tpexQuotes",
+          "sha256"
+        ],
+        "bad"
+      ]
+    ]
+  },
+  {
+    "name": "source cannot forge latest version",
+    "valid": false,
+    "ops": [
+      [
+        "set",
+        [
+          "sources",
+          "quotes",
+          "sha256"
+        ],
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      ]
+    ]
   }
 ]

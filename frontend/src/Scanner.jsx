@@ -367,8 +367,8 @@ function DataModal({ onClose, onImport, onDemo, error, clearError }) {
   async function submitFile(e){const f=e.target.files?.[0];if(!f)return;setLoading(true);clearError();try{onImport(validateMarket(JSON.parse(await f.text())));}catch(err){clearError(err.message)}finally{setLoading(false);if(fileRef.current)fileRef.current.value='';}}
   return <div className="modal-backdrop" onClick={onClose}><div className="data-modal" role="dialog" aria-modal="true" aria-label="資料來源設定" onClick={e=>e.stopPropagation()}>
     <div className="drawer-head"><div><span className="eyebrow">DATA SOURCE</span><h2>接入正式市場資料</h2></div><button className="icon-btn" onClick={onClose} aria-label="關閉資料設定"><X size={20}/></button></div>
-    <p className="muted">這版不會直接把任意 Claude `market.json` 當成相容資料。須先轉成 README 定義的 schemaVersion 2 格式，避免欄位或單位錯誤。</p>
-    <label className="field-label" htmlFor="dataurl">market.json HTTPS 網址（必須允許 CORS）</label><div className="source-row"><input id="dataurl" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://example.com/market.json"/><button className="primary-btn" disabled={!url.trim()||loading} onClick={submitUrl}>{loading?'讀取中':'讀取 JSON'}</button></div>
+    <p className="muted">只讀取通過契約驗證的官方盤後快照。缺值與舊資料保留原日期，不自動補成模擬行情。</p>
+    <label className="field-label" htmlFor="dataurl">market.json 網址（本站或 raw.githubusercontent.com）</label><div className="source-row"><input id="dataurl" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://raw.githubusercontent.com/0857ken/tw-market-scanner/market-data/data/market.json"/><button className="primary-btn" disabled={!url.trim()||loading} onClick={submitUrl}>{loading?'讀取中':'讀取 JSON'}</button></div>
     <div className="data-sep">或</div><label className="upload-btn"><Upload size={17}/> 從手機／電腦選擇 market.json<input type="file" accept=".json,application/json" ref={fileRef} onChange={submitFile} hidden/></label>
     {error&&<div className="errorbox"><AlertTriangle size={16}/>{error}</div>}
     <button type="button" className="demo-choice" onClick={onDemo}>檢視虛構 DEMO（僅供介面示意）</button>
@@ -478,7 +478,7 @@ export default function Scanner(){
           <button className="data-cta" onClick={()=>setSourceOpen(true)} aria-label="接入資料"><Database size={16}/><span>接入資料</span></button><span className={`top-mode ${quoteStatus!=='fresh'?'top-demo':''}`}>{market.mode==='demo'?'DEMO':market.mode==='unavailable'?'待資料':'盤後'}</span></div>
       </header>
       <main className="content">
-        <div className="page-top"><div><div className="eyebrow">MARKET INTELLIGENCE / {market.asOf}</div><h1>{page==='總覽'?'市場總覽':page}</h1><p>{page==='總覽'?'用更少的畫面，掌握真正重要的市場變化。':'資料缺口會明確標示，不用猜測任何數字。'}</p></div>
+        <div className="page-top"><div><div className="eyebrow">盤後觀察版 / {signals.anchor||market.asOf||"待資料"}</div><h1>{page==='總覽'?'市場總覽':page}</h1><p>{page==='總覽'?'用更少的畫面，掌握真正重要的市場變化。':'資料缺口會明確標示，不用猜測任何數字。'}</p></div>
           <div className="quick-search"><Search size={16}/><input id="stock-search" placeholder="搜尋股票，例如 2330、台積電" value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="清除搜尋" onClick={()=>setSearch('')}><X size={15}/></button>}
             {search&&<div className="search-results">{currentStocks.length?currentStocks.map(s=><button key={securityKey(s)} onClick={()=>{setSelected(s);setSearch('')}}><b>{s.symbol}</b><span>{s.name}</span><Percent value={s.change}/></button>):<p>找不到此股票</p>}</div>}
           </div>
@@ -488,18 +488,20 @@ export default function Scanner(){
         {error && !sourceOpen && <div className="errorbox global-error"><AlertTriangle size={16}/>{error}<button onClick={() => setSourceOpen(true)}>檢查資料來源</button></div>}
         <section className="coverage-panel" aria-label="研究母體與資料覆蓋">
           <div className="filters"><label>市場母體 <select aria-label="市場母體" value={scope} onChange={e=>{setScope(e.target.value);setSelected(null)}}>{Object.entries(MARKET_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
-          <label>均線／突破價格基礎 <select aria-label="均線／突破價格基礎" value={basis} onChange={e=>{setBasis(e.target.value);setSelected(null)}}>{Object.entries(BASIS_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
+          <label>研究價格基礎 <select aria-label="均線／突破價格基礎" value={basis} onChange={e=>{setBasis(e.target.value);setSelected(null)}}>{Object.entries(BASIS_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
           <p>{MARKET_NAMES[scope]}普通股 {signals.coverage.total} 檔 · 同日未還原價 {signals.coverage.quotes} / {signals.coverage.total}（{format(signals.coverage.quotePct,1)}%）· 經驗證還原價 {signals.coverage.adjusted} 檔</p>
           <p>同日原價未涵蓋 {signals.coverage.total-signals.coverage.quotes} 檔；缺價、來源日期不同或原因未確認，不推定為停牌。</p>
           <p className="daily-breadth">行情日 {signals.daily.date||"—"} · {signals.daily.available?`上漲 ${signals.daily.up} ／ 下跌 ${signals.daily.down} ／ 平盤 ${signals.daily.flat}`:signals.daily.datesAligned?"0 檔具備可判定漲跌資料":"上市櫃日期不一致，合併漲跌暫不計算"} · 可判定 {signals.daily.eligible}/{signals.daily.total} 檔</p>
+          <details className="coverage-details"><summary>來源、更新時間與停用功能說明</summary>
           <p>已觀測有效價格 {signals.coverage.minDays}–{signals.coverage.maxDays} 日／目標約 300 交易日；不代表連續完整日曆。</p>
           <p>完整 MA20／60／120／240：{[20,60,120,240].map(n=>signals.coverage.ma[n]).join('／')} 檔 · 可判定240日突破 {signals.coverage.breakout240} 檔</p>
           <p>{BASIS_NAMES[basis]} · {basis==='adjusted'?'尚無經驗證還原價時保持缺資料，不改用原價。':'均線為暫行研究；未還原突破須完整事件覆蓋且窗口無除權息／資本事件。'}</p>
           <p>資料日：{sourceDate} · 檔案產生：{market.generatedAt?.replace('T',' ')}；產檔時間不是行情更新日。</p>
           <p>法人：TPEx 可獨立研究；TWSE T86 停用，不提供完整上市櫃法人合計。轉板／下市／停牌歷史尚未完整驗證。</p>
+          </details>
         </section>
         {render()}
-        <footer>台股掃描器 3.0　／　資料日期 {market.asOf||'—'}　／　{market.mode==='demo'?'虛構示範':'TWSE / TPEx / TAIFEX；研究統計，非交易指令'}　／　<a href="https://data.gov.tw/license" target="_blank" rel="noreferrer">政府資料開放授權條款第 1 版</a></footer>
+        <footer>台股掃描器 3.0　／　資料日期 {market.asOf||'—'}　／　{market.mode==='demo'?'虛構示範':'臺灣證券交易所／證券櫃檯買賣中心／臺灣期貨交易所；開放資料第1版，普通股篩選及研究統計，非交易指令'}　／　<a href="https://data.gov.tw/license" target="_blank" rel="noreferrer">政府資料開放授權條款第 1 版</a></footer>
       </main>
     </div>
     <nav className="bottom-nav">{[['總覽',LayoutDashboard],['信用利差',ShieldAlert],['市場廣度',Waves],['高點突破',Zap],['我的關注',Star]].map(([v,Icon])=><button key={v} className={page===v?'active':''} onClick={()=>newPage(v)}><Icon size={20}/><span>{v}</span></button>)}</nav>
