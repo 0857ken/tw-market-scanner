@@ -173,5 +173,13 @@
     "productionUnchanged": true
   },
   "formalDataSha256Retained": "bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9",
-  "productionDeployment": false
+  "productionDeployment": false,
+  "twseOpenApiDiagnostic": {
+    "asOf": "2026-10-13",
+    "sha256": "5df791e5ee3ab5167e0a90d095f1da218253b48a8c3f664a1d57561cc173c08f",
+    "url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "rows": 1095,
+    "primary": "licensed-current-CSV",
+    "historicalRequests": 0
+  }
 }

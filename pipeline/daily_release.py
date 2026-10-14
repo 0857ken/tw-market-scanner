@@ -59,7 +59,7 @@ def project(p,run_id,now):
  if not DISABLED<=set(a['disabled']):raise ValueError('Frozen features missing')
  body=encoded(p);a.update(approvedInputSha256=sha(body),approvedAsOf=p['asOf'],version=f"eod-{p['asOf']}-{identity(p)[:12]}")
  published,r=observation_check(body,a,now=now)
- r.update(frontendId=STATIC_ID,runId=str(run_id),sourceIdentitySha256=identity(p),licensePolicySha256=sha((ROOT/'config/source-publication.json').read_bytes()),processorCommit=os.environ.get('GITHUB_SHA','local-uncommitted-dry-run'),releaseKind='daily-observation-dry-run')
+ r.update(frontendId=STATIC_ID,runId=str(run_id),sourceIdentitySha256=identity(p),licensePolicySha256=sha((ROOT/'config/source-publication.json').read_bytes()),processorCommit=os.environ.get('RC_COMMIT_SHA',os.environ.get('GITHUB_SHA','local-uncommitted-dry-run')),releaseKind='daily-observation-dry-run')
  return published,r
 def verify_snapshot_links(p,data_dir):
  """Parsed snapshots and exported current prices must refer to the same version."""

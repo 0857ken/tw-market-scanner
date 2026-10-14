@@ -83,6 +83,10 @@ class DailyReleaseTests(unittest.TestCase):
    with self.assertRaises(ValueError):verify_bundle(root/'new.zip',receipt,seed)
    (seed/'index.html').write_text('tampered')
    with self.assertRaises(ValueError):bundle(body,report,seed,root/'bad.zip')
+ def test_processor_commit_is_checked_out_head_not_pr_merge(self):
+  with patch.dict('os.environ',{'RC_COMMIT_SHA':'a'*40,'GITHUB_SHA':'b'*40}):
+   _,r=project(self.p,'test',self.now)
+   self.assertEqual(r['processorCommit'],'a'*40)
  def test_strict_strategy_gate_stays_closed(self):
   with self.assertRaisesRegex(ValueError,'calendar'):strict_check(self.p,self.now)
  def test_credit_t86_adjusted_never_projected(self):
