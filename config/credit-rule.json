@@ -1,0 +1,9 @@
+{
+  "id": "screenshot-original-pending",
+  "status": "pending",
+  "window": 189,
+  "greenBelow": null,
+  "redAtOrAbove": null,
+  "positionBelow": null,
+  "reason": "使用者要求以原始截圖為準。截圖同時有 0.30、0.28/0.32、±0.05 與 0.2540 RED，無法唯一還原判定及狀態切換。請見 docs/QUESTIONS_TO_RETURN.md。"
+}

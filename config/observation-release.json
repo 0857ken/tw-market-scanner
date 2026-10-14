@@ -1,0 +1,13 @@
+{
+  "profile": "observation-only",
+  "version": "4b1-rc1",
+  "approvedInputSha256": "0d63dfce2e572ef21ee51a759d5ba0ce36859d5b74936068b06f465a5f7e9411",
+  "approvedAsOf": "2026-10-13",
+  "approvalBasis": "Stage 4B-1 controlled latest official-data update and final candidate validation; no merge or deployment permission",
+  "deploymentAuthorized": false,
+  "priceBasis": "unadjusted",
+  "calendarVerification": "partial",
+  "enabled": ["daily-quotes", "search", "watchlist", "market-scope", "daily-breadth", "sectors", "heatmap", "tpex-institutional"],
+  "disabled": ["moving-averages", "breakouts", "credit-strategy", "twse-t86", "adjusted-prices", "historical-backtest", "intraday", "institutional-streaks"],
+  "freshnessPolicy": "Candidate may display dated approved snapshot with explicit age; Stage 4B must separately approve exact data hash and date. Incomplete calendars cannot certify latest-session freshness."
+}

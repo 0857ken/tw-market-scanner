@@ -1,0 +1,46 @@
+# Stage 4A has NO Pages permissions or deployment jobs.
+# Stage 4B requires explicit approval and a reviewed publication change.
+name: Manual observation candidate - publication disabled
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact 40-character reviewed commit SHA (candidate only)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  candidate:
+    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate immutable candidate reference
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 1
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --prefix frontend --no-audit --no-fund
+      - run: npm test
+      - run: npm run build:rc
+        env:
+          RC_COMMIT_SHA: ${{ inputs.candidate_sha }}
+      - uses: actions/upload-artifact@v7.0.2
+      # No Pages publication here, including manually dispatched runs.
+        with:
+          name: observation-rc-${{ inputs.candidate_sha }}
+          path: frontend/dist-rc/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error

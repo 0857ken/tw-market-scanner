@@ -1,0 +1,578 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/0857ken/tw-market-scanner/main/schemas/market-v2.schema.json",
+  "title": "TW Market Scanner audited EOD contract v2",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "mode",
+    "asOf",
+    "generatedAt",
+    "sources",
+    "stocks",
+    "indexHistory",
+    "futures",
+    "creditHistory",
+    "creditRule"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "mode": {
+      "enum": [
+        "live",
+        "unavailable"
+      ]
+    },
+    "asOf": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stocks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stock"
+      }
+    },
+    "indexHistory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/price"
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "futures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "contract",
+          "unit",
+          "foreign",
+          "trust",
+          "dealer"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "contract": {
+            "const": "TX"
+          },
+          "unit": {
+            "const": "contracts"
+          },
+          "foreign": {
+            "type": "integer"
+          },
+          "trust": {
+            "type": "integer"
+          },
+          "dealer": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "creditHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "hyg",
+          "shy"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "hyg": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "shy": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "spy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "creditRule": {
+      "type": "object",
+      "required": [
+        "status",
+        "window"
+      ],
+      "properties": {
+        "status": {
+          "const": "pending"
+        },
+        "window": {
+          "const": 189
+        }
+      }
+    },
+    "researchVersion": {
+      "const": 1
+    },
+    "research": {
+      "type": "object",
+      "required": [
+        "targetSessions",
+        "markets"
+      ],
+      "properties": {
+        "targetSessions": {
+          "const": 300
+        },
+        "markets": {
+          "type": "object",
+          "required": [
+            "TWSE",
+            "TPEx"
+          ],
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "asOf",
+              "sessions",
+              "calendarStatus",
+              "targetSessions"
+            ],
+            "properties": {
+              "asOf": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "sessions": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "calendarStatus": {
+                "const": "partial"
+              },
+              "targetSessions": {
+                "const": 300
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "price": {
+      "type": "object",
+      "required": [
+        "date",
+        "close"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "close": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "volumeShares": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "changeAmount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rawClose": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "adjustedClose": {
+          "type": "null"
+        },
+        "adjustmentVersion": {
+          "type": "null"
+        },
+        "source": {
+          "enum": [
+            "quotes",
+            "tpexQuotes"
+          ]
+        },
+        "sourceVersion": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "market": {
+          "enum": [
+            "TWSE",
+            "TPEx"
+          ]
+        }
+      }
+    },
+    "stock": {
+      "type": "object",
+      "required": [
+        "symbol",
+        "name",
+        "history"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "pattern": "^[0-9]{4}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/price"
+          }
+        },
+        "marketCapM": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "priceBasis": {
+          "enum": [
+            "unadjusted",
+            "adjusted-total-return"
+          ]
+        },
+        "institutional": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/institutional"
+          }
+        },
+        "margin": {
+          "$ref": "#/$defs/margin"
+        },
+        "market": {
+          "enum": [
+            "TWSE",
+            "TPEx"
+          ]
+        },
+        "securityId": {
+          "type": "string",
+          "pattern": "^(TWSE|TPEx):[0-9]{4}$"
+        },
+        "securityType": {
+          "const": "ordinary"
+        },
+        "lifecycle": {
+          "type": "object",
+          "required": [
+            "listedOn",
+            "delistedOn",
+            "suspensions",
+            "pointInTimeVerified",
+            "source",
+            "rosterAsOf",
+            "status"
+          ],
+          "properties": {
+            "listedOn": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "delistedOn": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            },
+            "suspensions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "to": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date"
+                  }
+                }
+              }
+            },
+            "pointInTimeVerified": {
+              "const": false
+            },
+            "status": {
+              "const": "current-roster-only"
+            }
+          }
+        },
+        "adjustment": {
+          "type": "object",
+          "required": [
+            "status",
+            "method",
+            "version"
+          ],
+          "properties": {
+            "status": {
+              "const": "unavailable"
+            },
+            "method": {
+              "type": "null"
+            },
+            "version": {
+              "type": "null"
+            }
+          }
+        },
+        "eventCoverage": {
+          "type": "object",
+          "required": [
+            "status",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown"
+            }
+          }
+        },
+        "events": {
+          "type": "array"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "name",
+        "status",
+        "asOf"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "fresh",
+            "stale",
+            "error",
+            "unknown",
+            "unavailable",
+            "imported"
+          ]
+        },
+        "asOf": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fetchedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "institutional": {
+      "type": "object",
+      "required": [
+        "date"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "foreignShares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "trustShares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "dealerShares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "totalShares": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "margin": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "balanceShares": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "limitShares": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "usagePct": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "researchVersion"
+        ]
+      },
+      "then": {
+        "required": [
+          "research"
+        ],
+        "properties": {
+          "stocks": {
+            "items": {
+              "required": [
+                "market",
+                "securityId",
+                "securityType",
+                "lifecycle",
+                "adjustment",
+                "events",
+                "eventCoverage"
+              ],
+              "properties": {
+                "history": {
+                  "items": {
+                    "required": [
+                      "rawClose",
+                      "adjustedClose",
+                      "adjustmentVersion",
+                      "source",
+                      "sourceVersion",
+                      "market"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

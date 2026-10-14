@@ -1,0 +1,61 @@
+name: Scanner tests
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - run: node scripts/audit-built.mjs
+      - run: npx --prefix frontend playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Build pinned observation candidate (no publication)
+        run: npm run build:rc
+        env:
+          RC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - run: npm run test:rc:e2e
+      - run: node scripts/audit-rc.mjs
+      - name: Preserve immutable observation candidate bundle
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: observation-rc-${{ github.event.pull_request.head.sha || github.sha }}
+          path: frontend/dist-rc/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+      - name: Save browser acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: scanner-browser-acceptance
+          path: |
+            test-results/*.png
+            test-results/stage3d-*.json
+            test-results/stage4a-*.json
+          retention-days: 1
+          if-no-files-found: warn

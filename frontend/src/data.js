@@ -1,3 +1,4 @@
+import {validateResearch} from './research.js';
 import { numeric, round } from './logic.js';
 const NAMES = [
  ['2330','台積電','半導體',2000],['2317','鴻海','電子代工',600],['2454','聯發科','半導體',750],['2308','台達電','電子零組件',390],
@@ -43,30 +44,102 @@ export function makeDemo() {
     spy *= 1 + (i > 230 ? -0.0005 : 0.0007) + normal(rand) * 0.012;
     return { date, hyg: round(hyg, 4), shy: round(shy, 4), spy: round(spy, 2) };
   });
-  return { schemaVersion: 1, mode: 'demo', asOf: '2026-06-30', source: '固定隨機種子／虛構示範市場', universe: '40 檔示範觀察池（非全部上市櫃）', indexHistory, stocks, futures, creditHistory };
+  return { schemaVersion: 2, mode: 'demo', asOf: '2026-06-30', generatedAt:'2026-06-30T16:30:00+08:00',
+    sources:{quotes:{name:'固定虛構測試',status:'demo',asOf:'2026-06-30'},credit:{name:'固定虛構測試',status:'demo',asOf:'2026-06-30'}},
+    creditRule:{status:'pending',window:189}, source: '固定隨機種子／虛構示範市場', universe: '40 檔示範觀察池（非全部上市櫃）', indexHistory, stocks, futures, creditHistory };
 }
-function validHistory(rows) { return Array.isArray(rows) && rows.every(r => typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) && numeric(r.close) && r.close > 0 && (r.volumeShares == null || numeric(r.volumeShares))); }
-export function validateMarket(payload) {
-  if (!payload || payload.schemaVersion !== 1) throw new Error('資料格式不相容：需要 schemaVersion: 1；Claude 的 market.json 欄位必須先對應，不可直接假設相容。');
-  if (payload.mode !== 'live') throw new Error('匯入正式資料須標記 mode: live；範例與模擬行情不可以當成正式資料。');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.asOf || '')) throw new Error('缺少合法 asOf (YYYY-MM-DD)。');
-  if (!Array.isArray(payload.stocks)) throw new Error('stocks 必須是陣列。');
-  const seen = new Set();
-  for (const stock of payload.stocks) {
-    if (typeof stock.symbol !== 'string' || !/^\d{4}[A-Z]?$/i.test(stock.symbol) || seen.has(stock.symbol)) throw new Error(`代號錯誤或重複：${String(stock.symbol)}`);
-    seen.add(stock.symbol);
-    if (!validHistory(stock.history)) throw new Error(`${stock.symbol} 缺少有效 history：每筆需 date、close、可選 volumeShares。`);
-    if (!stock.history.every((r, i, arr) => i === 0 || arr[i - 1].date < r.date)) throw new Error(`${stock.symbol} 的 history 日期必須遞增且不重複。`);
-    if (stock.institutional && (!Array.isArray(stock.institutional) || !stock.institutional.every(r => typeof r.date === 'string' && ['foreignShares','trustShares','dealerShares'].every(k => r[k] == null || numeric(r[k]))))) throw new Error(`${stock.symbol} institutional 欄位或單位錯誤（應為股數）。`);
+
+export function makeUnavailable() {
+  return {schemaVersion:2, mode:'unavailable', asOf:null, generatedAt:new Date().toISOString(),
+    source:'等待官方盤後資料', universe:'尚未載入市場母體', stocks:[],indexHistory:[],futures:[],creditHistory:[],
+    sources:{quotes:{name:'TWSE 價量',status:'unavailable',asOf:null,reason:'尚未載入'}},creditRule:{status:'pending',window:189}};
+}
+const isDate = value => typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10)===value;
+const isTimestamp = value => typeof value==='string' && /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]([01]\d|2[0-3]):[0-5]\d)$/.test(value) && isDate(value.slice(0,10)) && Number.isFinite(Date.parse(value));
+function history(rows, fields, label, positive=[]) {
+  if(!Array.isArray(rows)) throw new Error(`${label} 必須是陣列`);
+  let previous='';
+  for(const row of rows){
+    if(!isDate(row?.date)||row.date<=previous) throw new Error(`${label} 日期須有效、遞增且不重複`);
+    if(fields.includes('close')&&!Object.hasOwn(row,'close')) throw new Error(`${label} 需要明確的 close，缺值用 null`);
+    previous=row.date;
+    for(const field of fields) if(row[field]!=null&&!numeric(row[field])) throw new Error(`${label} ${field} 必須是數字或 null`);
+    for(const field of positive) if(row[field]!=null&&row[field]<=0) throw new Error(`${label} ${field} 必須大於零`);
   }
-  if (payload.indexHistory && !validHistory(payload.indexHistory)) throw new Error('indexHistory 格式錯誤。');
-  if (payload.creditHistory && !payload.creditHistory.every(r => typeof r.date === 'string' && numeric(r.hyg) && numeric(r.shy))) throw new Error('creditHistory 格式錯誤。');
-  if (payload.futures && !payload.futures.every(r => typeof r.date === 'string' && ['foreign','trust','dealer'].every(k => r[k] == null || numeric(r[k])))) throw new Error('futures 格式錯誤：單位應為口。');
-  // Does not alter or create data; optional features stay unavailable until supplied.
-  return { ...payload, mode: 'live', source: payload.source || '使用者匯入資料', universe: payload.universe || `${payload.stocks.length} 檔匯入標的` };
+}
+const taipeiDay = value => new Date(value).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'});
+export function validateMarket(payload, now=new Date()) {
+  if(!payload||payload.schemaVersion!==2) throw new Error('需要 schemaVersion: 2；舊格式須由資料管線轉換，不能只改 mode');
+  if(!['live','unavailable'].includes(payload.mode)) throw new Error('mode 必須是 live 或 unavailable；拒絕 DEMO/範例冒充正式資料');
+  if(!isTimestamp(payload.generatedAt)) throw new Error('generatedAt 需包含時區');
+  const ceiling=[taipeiDay(payload.generatedAt),taipeiDay(now)].sort()[0];
+  if(!payload.creditRule||payload.creditRule.status!=='pending'||payload.creditRule.window!==189) throw new Error('信用規則待原作者確認，資料檔不得自行啟用');
+  if(payload.asOf!=null&&(!isDate(payload.asOf)||payload.asOf>ceiling)) throw new Error('asOf 日期錯誤或在未來');
+  if(!Array.isArray(payload.stocks)||!payload.sources||typeof payload.sources!=='object'||Array.isArray(payload.sources)) throw new Error('需要 stocks 及逐模組 sources');
+  const seen=new Set();
+  for(const stock of payload.stocks){
+    if(typeof stock.symbol!=='string'||!/^\d{4}$/.test(stock.symbol)||seen.has(`${stock.market||'TWSE'}:${stock.symbol}`)||typeof stock.name!=='string') throw new Error('股票代號/名稱錯誤或重複');
+    seen.add(`${stock.market||'TWSE'}:${stock.symbol}`);
+    history(stock.history,['close','volumeShares','changeAmount'],stock.symbol,['close']);
+    if(stock.history.some(r=>r.date>payload.asOf||r.volumeShares!=null&&r.volumeShares<0)) throw new Error('股票日期或成交量不合法');
+    history(stock.institutional||[],['foreignShares','trustShares','dealerShares','totalShares'],`${stock.symbol} 法人`);
+    if(stock.margin){
+      if(!isDate(stock.margin.date)) throw new Error('融資需要獨立資料日');
+      for(const k of ['balanceShares','limitShares','usagePct']) if(stock.margin[k]!=null&&(!numeric(stock.margin[k])||stock.margin[k]<0)) throw new Error('融資單位或數值不合法');
+    }
+  }
+  history(payload.indexHistory,['close'],'指數',['close']);
+  history(payload.creditHistory,['hyg','shy','spy'],'信用',['hyg','shy','spy']);
+  if((payload.creditHistory||[]).some(r=>!numeric(r.hyg)||r.hyg<=0||!numeric(r.shy)||r.shy<=0)) throw new Error('信用價格須完整配對且大於零');
+  history(payload.futures,['foreign','trust','dealer'],'期貨');
+  if((payload.futures||[]).some(r=>r.contract!=='TX'||r.unit!=='contracts'||['foreign','trust','dealer'].some(k=>!Number.isInteger(r[k])))) throw new Error('期貨須明確為 TX 淨未平倉，單位口');
+  for(const [key,source] of Object.entries(payload.sources)){
+    if(!source||Array.isArray(source)||typeof source.name!=='string'||!Object.hasOwn(source,'asOf')) throw new Error('來源需要名稱及資料日');
+    if(!['fresh','stale','error','unknown','unavailable','imported'].includes(source.status)) throw new Error('來源品質狀態不合法');
+    if(source.asOf!=null&&!isDate(source.asOf)) throw new Error('來源日期不合法');
+    if(source.fetchedAt&&(!isTimestamp(source.fetchedAt))) throw new Error('來源抓取時間不合法');
+    if(key!=='calendar'&&source.asOf>ceiling) throw new Error('來源資料日不能在未來');
+    for(const k of ['url','license']) if(source[k]){try{const u=new URL(source[k]);if(u.protocol!=='https:'||u.username||u.password)throw new Error();}catch{throw new Error('來源及授權連結須為無憑證 HTTPS')}}
+  }
+  if(payload.mode==='live'&&(!isDate(payload.asOf)||!payload.stocks.length||[payload.sources.quotes?.asOf||'',payload.sources.tpexQuotes?.asOf||''].sort().at(-1)!==payload.asOf||!/^([a-f0-9]{64})$/.test(payload.sources.quotes?.sha256||''))) throw new Error('live 需要可追溯的正式價量快照，不能把 DEMO 換標籤');
+  if(payload.creditHistory?.length&&payload.sources.credit?.priceBasis!=='adjusted-total-return') throw new Error('信用資料必須明確為還原權息價');
+  const bounded=(rows,module,modules=[module])=>{const day=modules.map(key=>payload.sources[key]?.asOf||'').sort().at(-1);if(rows.length&&(!day||rows.some(r=>r.date>day)))throw new Error(`${module} 觀測日期超過來源資料日或缺少來源日期`);};
+  bounded(payload.indexHistory,'indexHistory',['indexHistory','index']);bounded(payload.futures,'futures');bounded(payload.creditHistory,'credit');
+  for(const stock of payload.stocks){bounded(stock.institutional||[],stock.market==='TPEx'?'tpexInstitutional':'institutional');bounded(stock.margin?[stock.margin]:[],'margin');}
+  if(payload.quoteSessions!=null){
+    if(!Array.isArray(payload.quoteSessions))throw new Error('quoteSessions 必須是陣列');
+    history(payload.quoteSessions.map(date=>({date})),[],'交易日');
+    if(payload.quoteSessions.some(d=>!payload.asOf||d>payload.asOf))throw new Error('交易日超過價量資料日');
+  }
+  if('researchVersion' in payload)validateResearch(payload);
+  return payload;
 }
 export async function fetchMarket(url) {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`讀取失敗：HTTP ${res.status}`);
-  return validateMarket(await res.json());
+  const base=globalThis.location?.href||'https://scanner.invalid/';
+  const target=new URL(url,base),sameOrigin=target.origin===new URL(base).origin;
+  if(target.username||target.password||!sameOrigin&&!(target.protocol==='https:'&&target.hostname==='raw.githubusercontent.com'))throw new Error('資料網址僅允許本站或無憑證的 GitHub 原始資料；其他來源請匯入 JSON 檔');
+  target.searchParams.set('scanner_check',String(Date.now()));
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const res=await fetch(target.href,{cache:'no-store',credentials:'omit',signal:controller.signal});
+    if(!res.ok) throw new Error(`讀取失敗：HTTP ${res.status}`);
+    return validateMarket(await res.json());
+  } finally {clearTimeout(timer);}
+}
+
+export function effectiveStatus(source, calendar, now=new Date()) {
+  if(!source||['error','unavailable','demo'].includes(source.status)) return source?.status||'unavailable';
+  if(!source.asOf||!calendar?.rows?.length) return source.status==='stale'?'stale':'unknown';
+  const parts = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+  let day=new Date(`${p.year}-${p.month}-${p.day}T00:00:00Z`);
+  if(Number(p.hour)<16 || Number(p.hour)===16 && Number(p.minute)<30) day.setUTCDate(day.getUTCDate()-1);
+  const closed=new Set(calendar.rows.filter(r=>r.closed).map(r=>r.date));
+  const years=new Set(calendar.rows.map(r=>r.date.slice(0,4)));
+  let known=years.has(day.toISOString().slice(0,4));
+  while([0,6].includes(day.getUTCDay())||closed.has(day.toISOString().slice(0,10))){day.setUTCDate(day.getUTCDate()-1);known=known&&years.has(day.toISOString().slice(0,4));}
+  const expected=day.toISOString().slice(0,10);
+  if(!known)return source.status==='stale'?'stale':'unknown';
+  return source.asOf<expected?'stale':source.status;
 }

@@ -2,20 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { creditLight, computeCredit, rollingVol, institutionalStreak, lastMA, stockMetrics, computeBreadth } from '../src/logic.js';
 import { makeDemo, validateMarket } from '../src/data.js';
-function h(n=150) { return Array.from({length:n},(_,i)=>({date:`2026-01-${String(i+1).padStart(3,'0')}`,close:100+i,volumeShares:1000000})); }
-test('credit threshold has no RED 0.254 contradiction',()=>{
-  assert.equal(creditLight(0.24999),'GREEN');
-  assert.equal(creditLight(0.25),'YELLOW');
-  assert.equal(creditLight(0.254),'YELLOW');
-  assert.equal(creditLight(0.34999),'YELLOW');
-  assert.equal(creditLight(0.35),'RED');
+function h(n=150) { return Array.from({length:n},(_,i)=>({date:new Date(Date.UTC(2025,0,1+i)).toISOString().slice(0,10),close:100+i,volumeShares:1000000})); }
+const proposedRule={status:'confirmed',greenBelow:.25,redAtOrAbove:.35,positionBelow:.3};
+test('explicit rule boundaries are exact; fixture does not freeze the original screenshot',()=>{
+  assert.equal(creditLight(.254),'PENDING');
+  assert.equal(creditLight(0.24999,proposedRule),'GREEN');
+  assert.equal(creditLight(0.25,proposedRule),'YELLOW');
+  assert.equal(creditLight(0.254,proposedRule),'YELLOW');
+  assert.equal(creditLight(0.34999,proposedRule),'YELLOW');
+  assert.equal(creditLight(0.35,proposedRule),'RED');
 });
 test('high ratio is low credit pressure; low ratio is high pressure',()=>{
   const data=Array.from({length:190},(_,i)=>({date:new Date(Date.UTC(2025,0,1+i)).toISOString().slice(0,10),hyg:70+i*.3,shy:80,spy:100+i}));
-  const result=computeCredit(data,189);
+  const result=computeCredit(data,189,proposedRule);
   assert.equal(result.at(-1).indicator,0);
   assert.equal(result.at(-1).light,'GREEN');
-  const reverse=computeCredit(data.map((r,i)=>({...r,hyg:100-i*.3})),189);
+  const reverse=computeCredit(data.map((r,i)=>({...r,hyg:100-i*.3})),189,proposedRule);
   assert.ok(reverse.at(-1).indicator>.99);
   assert.equal(reverse.at(-1).light,'RED');
 });
@@ -23,7 +25,7 @@ test('historical price window insufficient => no MA or breakout',()=>{
   const stock={symbol:'2330',name:'example',history:h(20)};
   assert.equal(lastMA(stock.history,20),109.5);
   assert.equal(lastMA(stock.history,60),null);
-  assert.equal(stockMetrics(stock).breakout60,false);
+  assert.equal(stockMetrics(stock).breakout60,null);
 });
 test('breadth excludes stocks with inadequate MA history',()=>{
   const dates=['2026-10-07','2026-10-08'];
@@ -49,8 +51,8 @@ test('demo fixture stable and honestly labeled',()=>{
 });
 test('adapter refuses undocumented schema and fake mode',()=>{
   assert.throws(()=>validateMarket({stocks:[]}),/schemaVersion/);
-  assert.throws(()=>validateMarket({schemaVersion:1,mode:'demo',stocks:[],asOf:'2026-10-08'}),/mode/);
-  assert.doesNotThrow(()=>validateMarket({schemaVersion:1,mode:'live',stocks:[],asOf:'2026-10-08'}));
+  assert.throws(()=>validateMarket({schemaVersion:2,mode:'demo',stocks:[],asOf:'2026-10-08'}),/mode/);
+  assert.throws(()=>validateMarket({schemaVersion:2,mode:'live',stocks:[],asOf:'2026-10-08'}));
 });
 
 test('sample JSON is not importable as real market data', async()=>{

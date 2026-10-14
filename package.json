@@ -1,0 +1,18 @@
+{
+  "name": "tw-market-scanner",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "npm ci --prefix frontend",
+    "data": "python3 -m pipeline.run",
+    "data:strict": "python3 -m pipeline.run --strict",
+    "test": "python3 -m unittest discover -s tests -v && npm test --prefix frontend",
+    "build": "node scripts/prepare-data.mjs && npm run build --prefix frontend",
+    "dev": "node scripts/prepare-data.mjs && npm run dev --prefix frontend",
+    "preview": "node scripts/serve-built.mjs",
+    "test:e2e": "npm run test:e2e --prefix frontend",
+    "build:rc": "node scripts/build-rc.mjs",
+    "test:rc:e2e": "cd frontend && node node_modules/@playwright/test/cli.js test --config playwright.rc.config.js"
+  }
+}
