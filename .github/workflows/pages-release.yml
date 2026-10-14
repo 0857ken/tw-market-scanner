@@ -1,0 +1,167 @@
+name: First approved observation release
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Owner approval required - type PUBLISH-4b1-rc1
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: scanner-pages-first-release
+  cancel-in-progress: false
+env:
+  APPROVED_COMMIT: 82b1749a2626ce30d6196a101577b8bb09273c31
+  APPROVED_DATA: bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9
+  APPROVED_ZIP: 7621524742b25dfaa7a7216ca5f5b5006719a252966a0554ff7d0416c3262eee
+jobs:
+  verify:
+    if: github.repository == '0857ken/tw-market-scanner' && github.ref == 'refs/heads/main' && inputs.confirmation == 'PUBLISH-4b1-rc1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 82b1749a2626ce30d6196a101577b8bb09273c31
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Verify approved CI and artifact identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/0857ken/tw-market-scanner/actions/runs/38494657009 > approved-run.json
+          gh api repos/0857ken/tw-market-scanner/actions/artifacts/11862513391 > approved-artifact.json
+          python - <<'PY'
+          import json,os
+          r=json.load(open('approved-run.json'));a=json.load(open('approved-artifact.json'))
+          assert r['id']==38494657009 and r['status']=='completed' and r['conclusion']=='success'
+          assert r['head_sha']==os.environ['APPROVED_COMMIT']
+          assert a['id']==11862513391 and not a['expired']
+          assert a['workflow_run']['id']==38494657009 and a['workflow_run']['head_sha']==os.environ['APPROVED_COMMIT']
+          assert a['digest']=='sha256:'+os.environ['APPROVED_ZIP']
+          print('Fixed CI, artifact, candidate and ZIP digest verified; no finance requests or rebuild.')
+          PY
+      - name: Download exactly the approved original ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error --location --header "Authorization: Bearer $GH_TOKEN" --header "Accept: application/vnd.github+json" https://api.github.com/repos/0857ken/tw-market-scanner/actions/artifacts/11862513391/zip -o approved.zip
+          python -m pipeline.verify_rc approved.zip --zip-sha256 "$APPROVED_ZIP" --commit "$APPROVED_COMMIT" --data-sha256 "$APPROVED_DATA" --as-of 2026-10-13
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('approved.zip') as archive:archive.extractall('site')
+          PY
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: site
+          include-hidden-files: true
+          retention-days: 1
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - id: publish
+        uses: actions/deploy-pages@v5.0.1
+  acceptance:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 82b1749a2626ce30d6196a101577b8bb09273c31
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Prepare pinned test fixture without building frontend
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --silent --show-error --location --header "Authorization: Bearer $GH_TOKEN" --header "Accept: application/vnd.github+json" https://api.github.com/repos/0857ken/tw-market-scanner/actions/artifacts/11862513391/zip -o approved.zip
+          python -m pipeline.verify_rc approved.zip --zip-sha256 "$APPROVED_ZIP" --commit "$APPROVED_COMMIT" --data-sha256 "$APPROVED_DATA" --as-of 2026-10-13
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('approved.zip') as archive:archive.extractall('frontend/dist-rc')
+          PY
+      - name: Verify live HTTPS, all public file hashes and response policies
+        run: |
+          python - <<'PY'
+          import json,hashlib,time
+          from urllib.request import Request,urlopen
+          from pathlib import Path
+          base='https://0857ken.github.io/tw-market-scanner/'
+          m=json.loads(Path('frontend/dist-rc/release-manifest.json').read_text())
+          expected={**m['assets'],'release-manifest.json':hashlib.sha256(Path('frontend/dist-rc/release-manifest.json').read_bytes()).hexdigest()}
+          results={}
+          for name,digest in expected.items():
+            if name=='.nojekyll':continue
+            for attempt in range(3):
+              try:
+                with urlopen(Request(base+name,headers={'Cache-Control':'no-cache'}),timeout=20) as r:
+                  body=r.read(8*1024*1024);headers=dict(r.headers);status=r.status;url=r.url
+                assert url.startswith(base) and status==200 and hashlib.sha256(body).hexdigest()==digest,name+' live digest mismatch'
+                results[name]={'status':status,'sha256':digest,'headers':headers};break
+              except Exception:
+                if attempt==2:raise
+                time.sleep(3)
+          Path('test-results').mkdir(exist_ok=True)
+          Path('test-results/stage4b2-live-http.json').write_text(json.dumps({'base':base,'candidateCommit':m['candidateCommit'],'dataSha256':m['publishedDataSha256'],'files':results,'scope':'Read-only site verification; no redeploy or rollback'},indent=2))
+          print('Live HTTPS and all public artifact SHA256 values match the original approved ZIP.')
+          PY
+      - run: npm ci --prefix frontend --no-audit --no-fund
+      - run: npx --prefix frontend playwright install --with-deps chromium
+      - name: Configure live browser acceptance only
+        run: |
+          cat > frontend/playwright.live.config.js <<'JS'
+          import {defineConfig} from '@playwright/test';
+          export default defineConfig({testDir:'./e2e',testMatch:['observation-rc.spec.js','live-touch.spec.js'],workers:1,timeout:45000,reporter:[['list'],['json',{outputFile:'../test-results/stage4b2-live-browser.json'}]],use:{baseURL:'https://0857ken.github.io/tw-market-scanner/',headless:true},projects:[{name:'live-chromium',use:{browserName:'chromium'}}]});
+          JS
+          cat > frontend/e2e/live-touch.spec.js <<'JS'
+          import {test,expect} from '@playwright/test';
+          test.use({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+          test('Live touch: heatmap, detail, bottom navigation and data warnings',async({page})=>{
+            await page.goto('./');await expect(page.locator('.data-banner')).toContainText('2026-10-13');
+            await page.getByRole('combobox',{name:'市場母體'}).selectOption('TPEx');
+            await page.getByRole('button',{name:'開啟選單',exact:true}).tap();
+            await page.locator('.sidebar .nav-item').filter({hasText:/^台股熱力圖$/}).tap();
+            await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
+            await page.locator('g[data-security-id]').first().tap();await expect(page.getByRole('dialog')).toBeVisible();
+            await page.getByRole('button',{name:'關閉',exact:true}).tap();
+            await page.locator('.bottom-nav button').filter({hasText:/^停用功能$/}).tap();await expect(page.locator('main')).toContainText('TWSE T86');
+            await page.locator('.bottom-nav button').filter({hasText:/^總覽$/}).tap();await expect(page.locator('.rc-version')).toContainText('4b1-rc1');
+            expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+            await page.screenshot({path:'../test-results/stage4b2-live-touch.png',fullPage:true});
+          });
+          JS
+      - name: Run read-only live Chromium scenarios (failure simulations are browser-local)
+        working-directory: frontend
+        run: node node_modules/@playwright/test/cli.js test --config playwright.live.config.js
+      - name: Save formal-site evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: formal-site-acceptance
+          path: |
+            test-results/stage4b2-*.json
+            test-results/stage4b2-*.png
+          retention-days: 1
