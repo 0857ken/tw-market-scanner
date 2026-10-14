@@ -1,9 +1,9 @@
 {
   "profile": "observation-only",
-  "version": "4a-rc1",
-  "approvedInputSha256": "1c8a9bea32923dc8b03d88958b6297820ba91f8cda729f16aa2b76f2b1e6790f",
-  "approvedAsOf": "2026-10-12",
-  "approvalBasis": "Stage 3D reviewed snapshot; Stage 4A authorizes candidate only, not deployment",
+  "version": "4b1-rc1",
+  "approvedInputSha256": "0d63dfce2e572ef21ee51a759d5ba0ce36859d5b74936068b06f465a5f7e9411",
+  "approvedAsOf": "2026-10-13",
+  "approvalBasis": "Stage 4B-1 controlled latest official-data update and final candidate validation; no merge or deployment permission",
   "deploymentAuthorized": false,
   "priceBasis": "unadjusted",
   "calendarVerification": "partial",

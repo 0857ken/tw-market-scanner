@@ -514,7 +514,7 @@ export default function Scanner(){
         {page==='總覽'&&<div className="health-strip"><button onClick={()=>newPage('資料健康')}>價量 {STATUS_NAMES[quoteStatus]}</button><span>觀測 {selectedExchanges.map(m=>`${m} ${marketMeta(market,m).sessions?.length||0} 日`).join('／')}</span><span>{market.mode==='demo'?'DEMO 觀察池':`${MARKET_NAMES[scope]} ${signals.latest.length} 檔`}</span><span>{market.calendar?.state==='closed'?'官方日曆：休市':market.calendar?.state==='open'?'官方日曆：交易日':'日曆待核對'}</span></div>}
         {error && !sourceOpen && <div className="errorbox global-error"><AlertTriangle size={16}/>{error}<button onClick={() => OBSERVATION_ONLY?newPage('資料健康'):setSourceOpen(true)}>檢查資料來源</button></div>}
         {OBSERVATION_ONLY&&<section className="panel rc-version" aria-label="固定發布版本">
-          <p>observation-only · 4a-rc1 固定版本 · {import.meta.env.VITE_RC_COMMIT?.slice(0,12)}</p>
+          <p>observation-only · {import.meta.env.VITE_RC_VERSION} 固定版本 · {import.meta.env.VITE_RC_COMMIT?.slice(0,12)}</p>
           <p>核准行情日 {market.asOf||'尚未載入'} · 距今 {market.asOf?Math.max(0,Math.floor((Date.parse(new Date(clock).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}))-Date.parse(market.asOf))/86400000)):'—'} 個日曆日（不是交易日）· 不保證最新。</p>
           <p>資料 SHA256 {import.meta.env.VITE_APPROVED_DATA_SHA256?.slice(0,16)}… · 日曆僅部分資料；最新交易日未完整驗證。</p>
           <a href={`${import.meta.env.BASE_URL}release-manifest.json`} target="_blank" rel="noreferrer">完整 SHA、資料版本與資源清單</a>
@@ -524,6 +524,7 @@ export default function Scanner(){
           {!OBSERVATION_ONLY&&<label>研究價格基礎 <select aria-label="均線／突破價格基礎" value={basis} onChange={e=>{setBasis(e.target.value);setSelected(null)}}>{Object.entries(BASIS_NAMES).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>}{OBSERVATION_ONLY&&<span>顯示價格：未還原；所有均線／突破停用</span>}</div>
           <p>{MARKET_NAMES[scope]}普通股 {signals.coverage.total} 檔 · 同日未還原價 {signals.coverage.quotes} / {signals.coverage.total}（{format(signals.coverage.quotePct,1)}%）· 經驗證還原價 {signals.coverage.adjusted} 檔</p>
           <p>同日原價未涵蓋 {signals.coverage.total-signals.coverage.quotes} 檔；缺價、來源日期不同或原因未確認，不推定為停牌。</p>
+          {OBSERVATION_ONLY&&<p>母體名單日期：上市 {market.sources?.companies?.asOf||'—'}／上櫃 {market.sources?.tpexCompanies?.asOf||'—'}。名單日與行情日不同時，新增／轉板成員仍需人工核對；不宣稱歷史母體完整。</p>}
           <p className="daily-breadth">行情日 {signals.daily.date||"—"} · {signals.daily.available?`上漲 ${signals.daily.up} ／ 下跌 ${signals.daily.down} ／ 平盤 ${signals.daily.flat}`:signals.daily.datesAligned?"0 檔具備可判定漲跌資料":"上市櫃日期不一致，合併漲跌暫不計算"} · 可判定 {signals.daily.eligible}/{signals.daily.total} 檔</p>
           <details className="coverage-details"><summary>來源、更新時間與停用功能說明</summary>
           <p>已觀測有效價格 {signals.coverage.minDays}–{signals.coverage.maxDays} 日／目標約 300 交易日；不代表連續完整日曆。</p>

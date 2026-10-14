@@ -2,7 +2,7 @@ import copy
 import hashlib
 import json
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from pipeline.common import ROOT, TPE, read_json
 from pipeline.observation_release import check
@@ -13,7 +13,7 @@ class ObservationReleaseTests(unittest.TestCase):
     def setUp(self):
         self.body = (ROOT / 'data/market.json').read_bytes()
         self.approval = read_json(ROOT / 'config/observation-release.json')
-        self.now = datetime(2026, 10, 14, 18, tzinfo=TPE)
+        self.now = datetime.fromisoformat(self.approval['approvedAsOf']).replace(hour=18,tzinfo=TPE) + timedelta(days=2)
 
     def test_dated_observation_does_not_relax_full_strategy(self):
         encoded, report = check(self.body, now=self.now)
@@ -64,7 +64,7 @@ class ObservationReleaseTests(unittest.TestCase):
             check(body, approval=approval, now=self.now)
 
     def test_projection_is_deterministic(self):
-        self.assertEqual(check(self.body, now=self.now)[0], check(self.body, now=datetime(2026,10,15,tzinfo=TPE))[0])
+        self.assertEqual(check(self.body, now=self.now)[0], check(self.body, now=self.now+timedelta(days=1))[0])
 
     def test_candidate_cannot_grant_deployment_permission(self):
         with self.assertRaises(ValueError):

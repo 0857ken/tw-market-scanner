@@ -1,0 +1,32 @@
+{
+  "stage": "4B-1",
+  "status": "controlled-update-validated",
+  "startedAt": "2026-10-14T02:28:36+08:00",
+  "dataAttemptReport": "data/daily-attempt.json",
+  "logicalEndpointChecks": 7,
+  "retryPolicy": "Existing JSON adapter max 2 bounded attempts; CSV and OpenAPI crosscheck max 1. Only one run_daily invocation; no historical/date parameters.",
+  "historicalRequests": 0,
+  "t86Requests": 0,
+  "scheduleEnabled": false,
+  "deploymentAuthorized": false,
+  "originalStage4ACommit": "e83c1738b60accfe852758c8e3a9096059bcb717",
+  "originalStage4APublishedSha256": "8a6973bc9d25ea4bce964f35191c40490873ce57df19c20248b77cda4b0145e1",
+  "updatedInputSha256": "0d63dfce2e572ef21ee51a759d5ba0ce36859d5b74936068b06f465a5f7e9411",
+  "selectedTwseQuoteSource": "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data",
+  "selectedTwseSourceSha256": "db1641e56cae2af976bb65d10f47d2724ea4b71ce9cc3f875a83f37ce8cbcdc9",
+  "selectedTwseSourceDate": "2026-10-13",
+  "openApiCrosscheck": {
+    "url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
+    "startedAt": "2026-10-14T02:30:59+08:00",
+    "finishedAt": "2026-10-14T02:31:09+08:00",
+    "asOf": "2026-10-12",
+    "rowCount": 1095,
+    "sha256": "0b730b5d74e63a858d4bf901c7a9a21bff5ac739902e8a91258deb6120ffb141",
+    "sameDateAsCsv": false,
+    "priceComparison": "Not comparable: dates differ. No same-day price consistency assertion and no blending. CSV is dataset 11549's explicitly licensed current resource."
+  },
+  "rosterDates": {"TWSE":"2026-10-12","TPEx":"2026-10-13"},
+  "quoteDates": {"TWSE":"2026-10-13","TPEx":"2026-10-13"},
+  "tpexInstitutional": {"asOf":"2026-10-13","rows":773,"ordinaryStocksWithRows":773,"ordinaryStocksWithoutRows":120,"sourceSha256":"6425961c10b991dadda8b86f8ec003feb237d6357bec3cf1ce6ea9fccb6735a7","notFullTwseTpexInstitutionalData":true},
+  "limitations": ["TWSE latest official company roster still dated 2026-10-12; not relabelled", "29 ordinary stocks missing valid same-day price; not presumed suspended", "1 TPEx stock has a price but an unclassifiable official change", "Independent TPEx trading calendar incomplete", "Price adjustment, credit, TWSE T86 and historical strategy signals remain disabled"]
+}

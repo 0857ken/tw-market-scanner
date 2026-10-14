@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 const manifest=JSON.parse(fs.readFileSync(new URL('../dist-rc/release-manifest.json',import.meta.url)));
+const actualMarket=JSON.parse(fs.readFileSync(new URL('../dist-rc/market.json',import.meta.url)));
 async function loaded(page){await page.goto('./');await expect(page.locator('.data-banner')).toContainText(manifest.asOf);}
 async function go(page,name){
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
@@ -14,6 +15,8 @@ for(const width of [320,390,1440])test(`${width}px: pinned observation RC assets
   const failures=[];page.on('response',r=>{if(r.status()>=400)failures.push(r.url())});
   await loaded(page);
   await expect(page.locator('.rc-version')).toContainText('不保證最新');
+  await expect(page.locator('.rc-version')).toContainText(manifest.version);
+  await expect(page.getByRole('region',{name:'研究母體與資料覆蓋'})).toContainText(`上市 ${actualMarket.sources.companies.asOf}`);
   await expect(page.getByRole('button',{name:'接入資料',exact:true})).toHaveCount(0);
   await expect(page.locator('input[type=file]')).toHaveCount(0);
   await expect(page.getByText('檢視虛構 DEMO（僅供介面示意）')).toHaveCount(0);
@@ -56,4 +59,12 @@ test('unapproved bytes on initial load stay unavailable',async({page})=>{
   await page.route('**/market.json*',r=>r.fulfill({body:'{}',contentType:'application/json'}));
   await page.goto('./');await expect(page.locator('.global-error')).toContainText('SHA256 不符');
   await expect(page.locator('.data-banner')).toContainText('尚未載入');
+});
+test('real missing same-day price stays unknown in search and stock drawer',async({page})=>{
+  const stock=actualMarket.stocks.find(s=>{const day=actualMarket.sources[s.market==='TWSE'?'quotes':'tpexQuotes'].asOf;return !s.history.find(r=>r.date===day)?.close;});
+  expect(stock).toBeTruthy();await loaded(page);
+  await page.getByRole('combobox',{name:'市場母體'}).selectOption(stock.market);
+  await page.locator('#stock-search').fill(stock.symbol);await page.locator('.search-results button').first().click();
+  await expect(page.getByRole('dialog').locator('.stock-price b').first()).toHaveText('—');
+  await expect(page.getByRole('dialog').locator('.drawer-stats').first()).toContainText('停用');
 });
