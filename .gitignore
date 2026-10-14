@@ -15,3 +15,5 @@ test-results/
 playwright-report/
 data/raw/institutional_*.json
 .DS_Store
+
+dist-daily/

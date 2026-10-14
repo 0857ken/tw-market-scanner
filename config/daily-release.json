@@ -1,0 +1,15 @@
+{
+ "profile":"observation-only",
+ "frontendId":"observation-daily-v1",
+ "scheduleEnabled":false,
+ "productionPublicationAuthorized":false,
+ "approvedFrontendSeedZipSha256":null,
+ "minimumPriceCoveragePct":95,
+ "maximumCoverageDropPercentagePoints":2,
+ "maximumRosterRelativeChange":0.05,
+ "maximumRosterAgeCalendarDays":7,
+ "sameDayRevision":"separate-owner-review",
+ "calendarVerification":"partial",
+ "sourcePriority":"TWSE licensed current CSV primary; OpenAPI diagnostic only; no fallback after refusal/error",
+ "rollbackAuthorized":false
+}

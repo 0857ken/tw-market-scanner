@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,9 @@ def get_json(url, params=None, attempts=2):
                     raise ValueError('Response exceeds 20 MB limit')
             return json.loads(body), hashlib.sha256(body).hexdigest(), url
         except Exception as exc:
+            # Explicit official refusal/rate limiting is terminal; no retry or fallback.
+            if isinstance(exc, HTTPError) and exc.code in (403, 429):
+                raise
             last = exc
             if attempt + 1 < attempts:
                 time.sleep(1)

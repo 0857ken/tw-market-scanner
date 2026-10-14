@@ -9,6 +9,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from urllib.error import HTTPError
 
 from . import parsers
 from .common import ROOT, TPE, LICENSE, get_json, calendar_rows, expected_session, read_json, write_json, timestamp
@@ -89,6 +90,8 @@ def collect(data_dir, sources, module, parser, now, params=None, fetcher=None):
                            'sha256': last['sha256'] if last else None,
                            'rowCount': len(last['rows']) if last else 0,
                            'error': str(exc)}
+        if isinstance(exc, HTTPError):
+            sources[module]['httpStatus'] = exc.code
         print(f'{module}: ERROR {exc}', flush=True)
         return last
 

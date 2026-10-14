@@ -61,7 +61,7 @@ def quality(payload):
     return result
 
 
-def run_daily(data_dir, now=None, twse_current_csv=False):
+def run_daily(data_dir, now=None, twse_current_csv=False, stop_on_failure=False):
     data_dir = Path(data_dir).resolve()
     now = now or datetime.now(TPE)
     original = read_json(data_dir/'market.json')
@@ -79,6 +79,8 @@ def run_daily(data_dir, now=None, twse_current_csv=False):
         for module in MODULES:
             collect(stage, sources, module, PARSERS[module], now,
                     fetcher=fetch_twse_csv if module == 'quotes' and twse_current_csv else None)
+            if stop_on_failure and sources.get(module, {}).get('fetchStatus') != 'ok':
+                break
         attempt['sources'] = {m:sources.get(m) for m in MODULES}
         errors = [m for m in MODULES if sources.get(m, {}).get('fetchStatus') != 'ok']
         try:

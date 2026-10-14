@@ -40,6 +40,26 @@ jobs:
           RC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - run: npm run test:rc:e2e
       - run: node scripts/audit-rc.mjs
+      - name: Fixed daily frontend candidate and offline E2E dry-run
+        run: |
+          node scripts/build-daily-seed.mjs
+          python -m scripts.daily-dry-run
+          cd frontend
+          node node_modules/@playwright/test/cli.js test --config playwright.daily.config.js
+        env:
+          RC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Preserve daily dry-run audit evidence (no Pages permissions)
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: stage4c1-dry-run
+          path: |
+            test-results/stage4c1/
+            test-results/stage4c1-*.json
+            test-results/stage4c1-*.png
+            frontend/dist-daily/frontend-pin.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Preserve immutable observation candidate bundle
         uses: actions/upload-artifact@v7.0.2
         with:
