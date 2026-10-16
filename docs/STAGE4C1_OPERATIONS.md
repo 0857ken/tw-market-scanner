@@ -1,5 +1,7 @@
 # Stage 4C-1 每日盤後更新候選架構
 
+> 本文保留 Stage 4C-1 原始紀錄。候選 I/O、鎖、設定與更新入口已由 [Stage 4C-1B](STAGE4C1B_REVIEW.md) 補強；舊 run/daily CLI 停用。正式 baseline/state 與自動發布仍未完成。離線演練 output 不可覆寫；重跑請指定新的 output 路徑。
+
 正式站 https://0857ken.github.io/tw-market-scanner/ 已於 Stage 4B-2 發布固定 `4b1-rc1`，Run 38496725153。正式資料SHA：`bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9`；行情日2026-10-13。此次只新增 feature、Draft PR、非正式測試；沒有合併、排程、正式部署或付費資源。
 
 ## 架構與信任邊界

@@ -1,4 +1,7 @@
 {
+ "configurationScope":"candidate-rehearsal-only",
+ "descriptiveFields":["sourcePriority"],
+ "approvalNote":"Null seed permits only an explicitly hash-pinned rehearsal. Production/schedule/rollback flags must remain false; this module cannot grant production authority.",
  "profile":"observation-only",
  "frontendId":"observation-daily-v1",
  "scheduleEnabled":false,

@@ -6,6 +6,8 @@ Stage 4C-1 建立每日更新候選架構與非正式 dry-run：**沒有 schedul
 
 見 [Stage 4C-1 維運、架構與驗收](docs/STAGE4C1_OPERATIONS.md)。
 
+**Stage 4C-1B（待審查，尚未 push）：** 候選更新安全補強與限制見 [本輪說明](docs/STAGE4C1B_REVIEW.md)。正式 baseline/state、跨系統協調及排程僅有 [Stage 4C-2 介面設計](docs/STAGE4C2_INTERFACE_DESIGN.md)，尚未實作。
+
 ## 執行
 
 需要 Python 3.12+、Node.js 22+ 與 npm。核心資料管線只使用 Python 標準函式庫，不需要 API Key 或付費服務。
@@ -20,8 +22,7 @@ npm run preview
 開啟 `http://127.0.0.1:4173/tw-market-scanner/`。這是本機預覽，並非公開網址。開發模式使用 `npm run dev`，依終端顯示的 localhost 網址開啟。
 
 ```bash
-npm run data           # 取得官方盤後資料，允許有日期的過期快照
-npm run data:strict    # 關鍵來源落後或失敗時結束碼非 0
+npm run data:candidate -- --help  # 唯一候選入口；舊 data/data:strict 是相同入口別名
 npm run build         # 驗證資料後同步前端，不會自動發布
 ```
 
@@ -69,7 +70,7 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 python -m pipeline.daily --data-dir /path/to/isolated-data --twse-current-csv
 ```
 
-Stage 3C使用此隔離流程；原 `pipeline.run` 為較廣的舊流程，本階段未用它對外抓取。
+以上是歷史 Stage 3C 指令。Stage 4C-1B 已停用 `pipeline.run`／`pipeline.daily` 的直接 CLI，避免誤更新。現在只使用 `pipeline.daily_release`；須明確指定新的 output、target-date、run-id，預設離線，只有加上 `--fetch-current` 才會請求官方來源。參見本輪說明，不在唯讀稽核或離線測試中抓行情。
 
 [品質報表](data/quality.json) · [更新及CSV來源證據](data/stage3c-update-manifest.json) · [離線重播證據](data/stage3c-replay-evidence.json) · [TWSE詢問信草稿](docs/TWSE_LICENSE_INQUIRY_DRAFT.md) · [TPEx詢問信草稿](docs/TPEX_LICENSE_INQUIRY_DRAFT.md)。兩封信未寄出，歷史批量及價格還原尚未核准。
 

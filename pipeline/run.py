@@ -289,9 +289,4 @@ def run(data_dir=ROOT / 'data', strict=False, credit_file=None, now=None):
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--strict', action='store_true', help='Nonzero exit when critical modules are stale or failed')
-    ap.add_argument('--data-dir', type=Path, default=ROOT / 'data')
-    ap.add_argument('--credit-file', type=Path)
-    args = ap.parse_args()
-    sys.exit(run(args.data_dir, args.strict, args.credit_file))
+    sys.exit('Legacy acquisition CLI disabled for observation candidates. Use python -m pipeline.daily_release --help. No request made.')

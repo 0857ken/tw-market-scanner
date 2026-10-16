@@ -1,11 +1,13 @@
 """Offline package -> verify -> simulated replacement -> restore exact prior bytes."""
-import json,os,shutil,tempfile,zipfile
+import argparse,json,os,shutil,tempfile,zipfile
 from datetime import datetime
 from pathlib import Path
 from pipeline.common import ROOT,TPE,read_json,write_json
 from pipeline.daily_state import commit,restore
 from pipeline.daily_release import project,bundle,verify_bundle,controlled
-out=ROOT/'test-results/stage4c1';out.mkdir(parents=True,exist_ok=True)
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--output',type=Path,default=ROOT/'test-results/stage4c1')
+out=parser.parse_args().output;out.mkdir(parents=True,exist_ok=False)
 seed=ROOT/'frontend/dist-daily'
 now=datetime.now(TPE)
 p=read_json(ROOT/'data/market.json')
@@ -14,7 +16,6 @@ run_id='ci-fixture-'+os.environ.get('GITHUB_RUN_ID','local')
 controlled(ROOT/'data',out/'offline',p['asOf'],now,run_id)
 body,report=project(p,run_id,now)
 archive=out/'daily-preview.zip'
-if archive.exists():archive.unlink()
 receipt=bundle(body,report,seed,archive);verify_bundle(archive,receipt,seed)
 with tempfile.TemporaryDirectory(prefix='scanner-restore-') as t:
  previous=Path(t)/'previous';next_site=Path(t)/'next';restored=Path(t)/'restored'

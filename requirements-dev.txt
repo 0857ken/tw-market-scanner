@@ -1,0 +1,2 @@
+# Development-only structured workflow audit; the acquisition pipeline uses stdlib.
+PyYAML==6.0.3

@@ -1,4 +1,4 @@
-> 正式站已於Stage 4B-2上線，舊文以下為歷史紀錄。每日更新目前仍未啟用；最新架構與限制以 [Stage 4C-1維運說明](STAGE4C1_OPERATIONS.md) 為準。
+> 正式站已於Stage 4B-2上線，舊文以下為歷史紀錄。每日更新仍未啟用。候選安全補強以 [Stage 4C-1B](STAGE4C1B_REVIEW.md) 為準；正式更新僅有 [Stage 4C-2 設計](STAGE4C2_INTERFACE_DESIGN.md)，未實作。下列舊 pipeline.run CLI 已停用。
 
 # 開發、維運與發布
 

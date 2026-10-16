@@ -30,7 +30,11 @@ class DailyTests(unittest.TestCase):
         baseline=integrate(build(self.root,sources,self.snaps['calendar']['rows'],[],NOW),self.root)
         write_json(self.root/'market.json',baseline);write_json(self.root/'source-state.json',{'sources':sources})
 
-    def replay(self, changes=None, fail=None, now=NOW):
+    def next_output(self):
+        self.output=Path(self.tmp.name)/('candidate-'+str(len(list(Path(self.tmp.name).glob('candidate-*')))))
+        return self.output
+
+    def replay(self, changes=None, fail=None, now=NOW, expected_requests=6):
         samples=copy.deepcopy(self.snaps)
         if changes: changes(samples)
         adapters={m:(lambda raw,m=m:(samples[m]['date'],samples[m]['rows'])) for m in MODULES}
@@ -41,15 +45,15 @@ class DailyTests(unittest.TestCase):
             if m==fail: raise RuntimeError('offline simulated outage')
             return {},samples[m]['sha256'],url
         with patch('pipeline.daily.PARSERS',adapters),patch('pipeline.run.get_json',side_effect=fetch) as network:
-            code=run_daily(self.root,now)
-            self.assertEqual(network.call_count,6)
+            code=run_daily(self.root,now,output_dir=self.next_output())
+            self.assertEqual(network.call_count,expected_requests)
             return code
 
     def test_rerun_does_not_duplicate_or_rewrite_snapshots(self):
         before={p.name:p.read_bytes() for p in (self.root/'raw').glob('*.json')}
         self.assertEqual(self.replay(),0);self.assertEqual(self.replay(),0)
         self.assertEqual(before,{p.name:p.read_bytes() for p in (self.root/'raw').glob('*.json')})
-        market=read_json(self.root/'market.json')
+        market=read_json(self.output/'market.json')
         for s in market['stocks']:self.assertEqual(len(s['history']),len({r['date'] for r in s['history']}))
 
     def test_failed_source_retains_market_state_and_raw_bytes(self):
@@ -57,7 +61,7 @@ class DailyTests(unittest.TestCase):
         before={str(p):p.read_bytes() for p in files}
         self.assertEqual(self.replay(fail='tpexQuotes'),2)
         self.assertEqual(before,{str(p):p.read_bytes() for p in files})
-        self.assertEqual(read_json(self.root/'daily-attempt.json')['status'],'failed-last-valid-retained')
+        self.assertEqual(read_json(self.output.with_name(self.output.name+'.attempt.json'))['status'],'failed-last-valid-retained')
 
     def test_same_date_revision_and_regression_require_review(self):
         for mode in ('revision','regression'):
@@ -85,17 +89,17 @@ class DailyTests(unittest.TestCase):
         rows=[{'date':'2027-01-01','closed':True}]
         self.assertEqual(expected_session(datetime(2027,1,1,21,tzinfo=TPE),rows),('2026-12-31',False))
         self.assertEqual(self.replay(now=datetime(2027,1,4,21,tzinfo=TPE)),0)
-        self.assertEqual(read_json(self.root/'market.json')['sources']['quotes']['status'],'unknown')
+        self.assertEqual(read_json(self.output/'market.json')['sources']['quotes']['status'],'unknown')
 
     def test_market_dates_mismatch_is_not_combined_daily_breadth(self):
         def change(s):
             s['quotes']['date']='2026-10-12'
             for row in s['quotes']['rows']:row['date']='2026-10-12'
         self.assertEqual(self.replay(change),0)
-        q=read_json(self.root/'quality.json')['coverage']
+        q=read_json(self.output/'quality.json')['coverage']
         self.assertFalse(q['ALL']['sameDate']);self.assertIsNone(q['ALL']['up'])
         self.assertEqual(q['TPEx']['asOf'],'2026-10-08')
-        self.assertEqual(read_json(self.root/'market.json')['sources']['tpexQuotes']['status'],'unknown')
+        self.assertEqual(read_json(self.output/'market.json')['sources']['tpexQuotes']['status'],'unknown')
 
     def test_quality_categories_partition_and_unknown_is_not_suspension(self):
         q=quality(read_json(self.root/'market.json'))
@@ -124,7 +128,7 @@ class DailyTests(unittest.TestCase):
         def fetch(url,params=None):return {},samples[by_url[url]]['sha256'],url
         from pipeline.current_csv import URL
         with patch('pipeline.daily.PARSERS',adapters),patch('pipeline.run.get_json',side_effect=fetch) as api,patch('pipeline.daily.fetch_twse_csv',return_value=({},samples['quotes']['sha256'],URL)) as csv:
-            self.assertEqual(run_daily(self.root,NOW,twse_current_csv=True),0)
+            self.assertEqual(run_daily(self.root,NOW,twse_current_csv=True,output_dir=self.next_output()),0)
             self.assertEqual(api.call_count,5);csv.assert_called_once()
 
     def test_preclose_same_day_eod_rejected_for_both_markets(self):

@@ -50,13 +50,14 @@ class DailyReleaseTests(unittest.TestCase):
     self.assertEqual(request.call_count,1)
  def test_local_overlapping_attempt_stops(self):
   with tempfile.TemporaryDirectory() as t:
-   (Path(t)/'.lock').touch()
-   with self.assertRaises(FileExistsError):controlled(ROOT/'data',t,'2026-10-13',self.now,'test')
+   from pipeline.candidate_io import exclusive_lock
+   with exclusive_lock(Path(t)/'.result.lock'):
+    with self.assertRaises(BlockingIOError):controlled(ROOT/'data',Path(t)/'result','2026-10-13',self.now,'test')
  def test_failed_update_never_changes_baseline(self):
   before=(ROOT/'data/market.json').read_bytes()
   with tempfile.TemporaryDirectory() as t,patch('pipeline.daily_release.run_daily',return_value=2):
-   with self.assertRaises(ValueError):controlled(ROOT/'data',t,'2026-10-13',self.now,'failure',True)
-   self.assertTrue((Path(t)/'failure.json').exists())
+   with self.assertRaises(ValueError):controlled(ROOT/'data',Path(t)/'result','2026-10-13',self.now,'failure',True)
+   self.assertTrue((Path(t)/'result/failure.json').exists())
   self.assertEqual(before,(ROOT/'data/market.json').read_bytes())
  def test_immutable_bundle_new_sha_static_bytes_and_restore(self):
   with tempfile.TemporaryDirectory() as t:
@@ -66,7 +67,7 @@ class DailyReleaseTests(unittest.TestCase):
    body,report=project(self.p,'123',self.now)
    self.assertFalse(report['strategyComplete']);self.assertFalse(report['deploymentAuthorized'])
    receipt=bundle(body,report,seed,root/'old.zip');self.assertTrue(verify_bundle(root/'old.zip',receipt,seed))
-   candidate=root/'candidate';candidate.mkdir();(candidate/'gate.json').write_bytes(encoded({'decision':'candidate','runId':'123'}));(candidate/'candidate-market.json').write_bytes(body);(candidate/'candidate-report.json').write_bytes(encoded(report))
+   candidate=root/'candidate';candidate.mkdir();(candidate/'gate.json').write_bytes(encoded({'decision':'candidate','runId':'123','target':report['asOf'],'candidatePolicySha256':report['candidatePolicySha256']}));(candidate/'candidate-market.json').write_bytes(body);(candidate/'candidate-report.json').write_bytes(encoded(report))
    packed=package(candidate,root/'old.zip',receipt['zipSha256'],root/'packed');self.assertTrue(verify_bundle(root/'packed/daily-release.zip',packed,seed))
    (candidate/'gate.json').write_bytes(encoded({'decision':'no-op-identical','runId':'123'}))
    with self.assertRaises(ValueError):package(candidate,root/'old.zip',receipt['zipSha256'],root/'noop')
