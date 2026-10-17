@@ -1,5 +1,7 @@
 # 台股掃描器 3.0
 
+> Stage 4C-2B 已加入 [持久版本／安全發布的離線實作](docs/STAGE4C2B_IMPLEMENTATION.md)，依 [4C-2A 規格](docs/STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md) 延伸。正式 Releases／state／發布權限仍未初始化；所有官方更新入口必須先驗 successfulPointer，缺 state 即停止。以下舊候選命令屬歷史背景；不得用 checkout fixture 作正式 baseline。
+
 正式盤後觀察站：**https://0857ken.github.io/tw-market-scanner/**。Stage 4B-2 已合併 PR #1，使用核准固定版本 `4b1-rc1` 首次發布（Run `38496725153`）。正式快照的 TWSE／TPEx 行情日均為 **2026-10-13**，不是即時行情；TWSE 名單為10/12、29檔缺有效價格、交易日曆部分驗證、Safari 實機尚待驗收。正式版未啟用長期均線、突破、還原價格、回測、信用利差或 TWSE T86。
 
 Stage 4C-1 建立每日更新候選架構與非正式 dry-run：**沒有 schedule、没有正式網站更新權限、不寫 market-data、不合併 main**。獨立 React／Vite 前端與 Python 盤後資料管線；不讀取或修改 `txf-tracker`。目前母體為1,085檔上市、893檔上櫃普通股，有效價格1,949檔（98.53%）。來源日期與抓取時間分開顯示，延遲不補假資料。

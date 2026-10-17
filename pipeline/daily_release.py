@@ -140,7 +140,7 @@ def verify_bundle_bytes(body,receipt,seed):
   if m.get('productionBaselineVerified') is not False:raise ValueError('Candidate cannot certify a production baseline')
   if m['strategyComplete'] is not False or m['deploymentAuthorized'] is not False:raise ValueError('Unexpected release permission')
  return True
-def controlled(data_dir,output,target,now,run_id,fetch_current=False):
+def controlled(data_dir,output,target,now,run_id,fetch_current=False,*,baseline_binding=None,run_attempt=None,intended_slot=None):
  daily_policy.load()
  output=candidate_destination(data_dir,output)
  with exclusive_lock(output.parent/('.'+output.name+'.lock')), tempfile.TemporaryDirectory(prefix='.controlled-',dir=output.parent) as t:
@@ -157,10 +157,19 @@ def controlled(data_dir,output,target,now,run_id,fetch_current=False):
    p=read_json(stage/'market.json');verify_snapshot_links(p,stage);decision=gate(p,baseline,target)
    b,r=project(p,run_id,now)
    write_json(evidence/'gate.json',{'decision':decision,'target':target,'observedDates':{m:p['sources'][k]['asOf'] for m,k in [('TWSE','quotes'),('TPEx','tpexQuotes')]},'coverage':quality(p),'runId':str(run_id),'productionUnchanged':True,'baselineInputSha256':sha((Path(data_dir)/'market.json').read_bytes()),'candidatePolicySha256':daily_policy.digest(),'productionBaselineVerified':False})
+   if baseline_binding is not None:
+    from .publication_contract import positive
+    positive(run_attempt)
+    g=read_json(evidence/'gate.json');g.update(baselineBinding=baseline_binding,runAttempt=run_attempt,intendedSlot=intended_slot)
+    write_json(evidence/'gate.json',g)
    (evidence/'candidate-market.json').write_bytes(b);write_json(evidence/'candidate-report.json',r)
+   if decision=='candidate':
+    # Persist the complete parsed input closure before TemporaryDirectory exits.
+    from .acquisition_state import pack
+    atomic_bytes(evidence/'acquisition-state.zip',pack(stage),immutable=True)
   except Exception as exc:
    # A failed attempt never retains a previous success gate or half-written candidate.
-   for name in ('gate.json','candidate-market.json','candidate-report.json'):
+   for name in ('gate.json','candidate-market.json','candidate-report.json','acquisition-state.zip'):
     (evidence/name).unlink(missing_ok=True)
    write_json(evidence/'failure.json',{'error':str(exc),'runId':str(run_id),'productionUnchanged':True})
    publish_directory(evidence,output)
@@ -169,4 +178,5 @@ def controlled(data_dir,output,target,now,run_id,fetch_current=False):
   return decision
 if __name__=='__main__':
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--data-dir',type=Path,default=ROOT/'data');p.add_argument('--output',type=Path,required=True);p.add_argument('--target-date',required=True);p.add_argument('--run-id',required=True);p.add_argument('--fetch-current',action='store_true');a=p.parse_args();now=datetime.now(TPE)
+ if a.fetch_current:p.error('Official acquisition requires pipeline.verified_baseline; checkout/fixture baseline is not permitted')
  controlled(a.data_dir,a.output,target_day(now,a.target_date),now,a.run_id,a.fetch_current)

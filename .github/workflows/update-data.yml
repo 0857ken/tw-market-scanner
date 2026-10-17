@@ -1,10 +1,26 @@
-# Stage 4C-1: manual isolated acquisition only. NO schedule, data branch push or Pages.
+# Stage 4C-2B: only a verified successful pointer can seed manual acquisition.
 name: Daily observation data - isolated dry-run
 on:
   workflow_dispatch:
     inputs:
       target_date:
         description: Original intended completed TWSE/TPEx session (YYYY-MM-DD)
+        required: true
+        type: string
+      expected_zip_sha256:
+        description: Exact successful published ZIP SHA256 (no latest or fixture fallback)
+        required: true
+        type: string
+      expected_generation:
+        description: Exact successful generation
+        required: true
+        type: number
+      intended_slot:
+        description: Original manual slot identifier, retained across delayed runs
+        required: true
+        type: string
+      deadline:
+        description: Original slot deadline with timezone, ISO8601
         required: true
         type: string
 permissions:
@@ -29,7 +45,13 @@ jobs:
         env:
           TARGET_DATE: ${{ inputs.target_date }}
           RUN_ID: ${{ github.run_id }}
-        run: python -m pipeline.daily_release --output test-results/stage4c1-current --target-date "$TARGET_DATE" --run-id "$RUN_ID" --fetch-current
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          EXPECTED_ZIP: ${{ inputs.expected_zip_sha256 }}
+          EXPECTED_GENERATION: ${{ inputs.expected_generation }}
+          INTENDED_SLOT: ${{ inputs.intended_slot }}
+          SLOT_DEADLINE: ${{ inputs.deadline }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m pipeline.verified_baseline --output test-results/stage4c1-current --target-date "$TARGET_DATE" --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --expected-zip-sha256 "$EXPECTED_ZIP" --expected-generation "$EXPECTED_GENERATION" --slot "$INTENDED_SLOT" --deadline "$SLOT_DEADLINE" --fetch-current
       - name: Save candidate or failure evidence; never publish
         if: always()
         uses: actions/upload-artifact@v7.0.2

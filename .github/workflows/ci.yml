@@ -14,7 +14,7 @@ jobs:
   test:
     if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -60,6 +60,7 @@ jobs:
             test-results/stage4c1-*.json
             test-results/stage4c1-*.png
             frontend/dist-daily/frontend-pin.json
+            test-results/stage4c2b-*.json
           retention-days: 7
           if-no-files-found: warn
       - name: Preserve immutable observation candidate bundle

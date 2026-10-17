@@ -6,7 +6,7 @@ from .daily_release import sha,encoded,bundle,verify_bundle,safe_name,STATIC_ID
 from .candidate_io import candidate_destination, exclusive_lock, publish_directory
 from . import daily_policy
 
-def _package(candidate,seed_zip,expected_seed_sha,output):
+def _package(candidate,seed_zip,expected_seed_sha,output,*,baseline=None,slot=None,provenance=None):
  daily_policy.check_seed(expected_seed_sha)
  candidate,output=Path(candidate),Path(output);output.mkdir(parents=True,exist_ok=True)
  if (candidate/'failure.json').exists():raise ValueError('Failure evidence cannot be packaged')
@@ -32,13 +32,18 @@ def _package(candidate,seed_zip,expected_seed_sha,output):
   receipt=bundle(body,report,seed,output/'daily-release.zip')
   verify_bundle(output/'daily-release.zip',receipt,seed)
   write_json(output/'receipt.json',receipt)
+  if baseline is not None:
+   from .candidate_package import prepare_candidate
+   closure=prepare_candidate(baseline,candidate,(output/'daily-release.zip').read_bytes(),Path(seed_zip).read_bytes(),expected_seed_sha,slot,provenance,original_receipt=(output/'receipt.json').read_bytes())
+   for name,body in closure.items():
+    (output/name).write_bytes(body)
  return receipt
-def package(candidate,seed_zip,expected_seed_sha,output):
+def package(candidate,seed_zip,expected_seed_sha,output,*,baseline=None,slot=None,provenance=None):
  output=candidate_destination(candidate,output)
  with exclusive_lock(output.parent/('.'+output.name+'.lock')),tempfile.TemporaryDirectory(prefix='.package-',dir=output.parent) as t:
   candidate_destination(candidate,output)
   staged=Path(t)/'result'
-  receipt=_package(candidate,seed_zip,expected_seed_sha,staged)
+  receipt=_package(candidate,seed_zip,expected_seed_sha,staged,baseline=baseline,slot=slot,provenance=provenance)
   publish_directory(staged,output)
   return receipt
 if __name__=='__main__':

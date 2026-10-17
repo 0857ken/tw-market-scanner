@@ -9,7 +9,7 @@ on:
         type: string
       data_attempt:
         description: Exact source run attempt
-        default: '1'
+        required: true
         type: string
       seed_run:
         description: CI run containing reviewed fixed frontend seed
@@ -51,7 +51,7 @@ jobs:
           for k in ('DATA_RUN','DATA_ATTEMPT','SEED_RUN'):assert re.fullmatch('[0-9]+',os.environ[k])
           assert re.fullmatch('[a-f0-9]{64}',os.environ['SEED_SHA'])
           PY
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DATA_RUN" > source-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DATA_RUN/attempts/$DATA_ATTEMPT" > source-run.json
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SEED_RUN" > seed-run.json
           python - <<'PY'
           import json,os
@@ -66,13 +66,24 @@ jobs:
       - name: Package independently gated data with unchanged frontend bytes
         env:
           SEED_SHA: ${{ inputs.seed_zip_sha256 }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
-          import os
+          import os,json
           from pathlib import Path
           from pipeline.package_daily import package
+          from pipeline.github_transport import GitHubAPI
+          from pipeline.persistent_state import StateStore,GitHubState
+          from pipeline.release_archive import ReleaseArchive,GitHubReleases
+          from pipeline.live_verification import LiveVerifier
+          from pipeline.verified_baseline import load_verified_baseline
           seeds=list(Path('seed').rglob('daily-preview.zip'));assert len(seeds)==1
-          package('candidate',seeds[0],os.environ['SEED_SHA'],'test-results/stage4c1-package')
+          gate=json.load(open('candidate/gate.json'));binding=gate['baselineBinding']
+          api=GitHubAPI(os.environ['GH_TOKEN'])
+          baseline=load_verified_baseline(StateStore(GitHubState(api)),ReleaseArchive(GitHubReleases(api)),LiveVerifier(),binding['publishedZipSha256'],binding['generation'])
+          source=json.load(open('source-run.json'))
+          provenance={'sourceRunId':str(source['id']),'runAttempt':source['run_attempt'],'workflowPath':source['path'],'status':source['status'],'conclusion':source['conclusion'],'codeSha':source['head_sha'],'processorCommit':source['head_sha']}
+          package('candidate',seeds[0],os.environ['SEED_SHA'],'test-results/stage4c1-package',baseline=baseline,slot=gate['intendedSlot'],provenance=provenance)
           PY
       - uses: actions/upload-artifact@v7.0.2
         with:
