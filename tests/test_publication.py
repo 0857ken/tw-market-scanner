@@ -538,3 +538,50 @@ except CASConflict:sys.exit(3)
         opener=Mock(side_effect=[HTTPError('https://api.github.com',302,'asset',{'Location':'https://release-assets.githubusercontent.com/fixture'},None),Response(b'asset')])
         self.assertEqual(GitHubAPI('offline-test-token',opener)('GET','/releases/assets/1',binary=True),b'asset')
         self.assertNotIn('Authorization',opener.call_args_list[1].args[0].headers)
+
+    @cases('C02','P03','W03')
+    def test_disabled_mutation_wire_contracts_use_only_in_memory_clients(self):
+        # Exercise the otherwise closed wire paths only with mocked gates AND no-network clients.
+        from pipeline.github_transport import GitHubAPI
+        class Response:
+            status=201
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,limit):return b'{"id":17}'
+        opener=Mock(return_value=Response()); client=GitHubAPI('synthetic-test-token',opener,capability=object())
+        with patch('pipeline.github_transport.require_remote',return_value=None):
+            self.assertEqual(client('POST','/releases',{'tag_name':'offline'})['id'],17)
+            request=opener.call_args.args[0]
+            self.assertEqual(request.get_method(),'POST'); self.assertEqual(json.loads(request.data),{'tag_name':'offline'})
+            client('POST','uploads:/releases/17/assets?name=site.zip',b'original bytes')
+            request=opener.call_args.args[0]
+            self.assertTrue(request.full_url.startswith('https://uploads.github.com/repos/0857ken/tw-market-scanner/'))
+            self.assertEqual(request.data,b'original bytes')
+            client('PATCH','/git/refs/heads/scanner-release-state',{'sha':'c'*40,'force':False})
+            self.assertEqual(opener.call_args.args[0].get_method(),'PATCH')
+            self.assertFalse(json.loads(opener.call_args.args[0].data)['force'])
+        h='a'*40;c='c'*40;calls=[]
+        def api(method,path,payload=None,**kwargs):
+            calls.append((method,path,payload))
+            if method=='GET' and path=='/git/commits/'+h:return {'tree':{'sha':'d'*40}}
+            if method=='GET' and path=='/git/commits/'+c:return {'parents':[{'sha':h}]}
+            if path=='/git/blobs':return {'sha':'b'*40}
+            if path=='/git/trees':return {'sha':'e'*40}
+            if path=='/git/commits':return {'sha':c}
+            if path.startswith('/git/refs/'):return {'object':{'sha':c}}
+            if path=='/pages/deployments':return {'id':17}
+            raise AssertionError((method,path))
+        state=GitHubState(api)
+        with patch('pipeline.persistent_state.require_remote',return_value=None):
+            self.assertEqual(state.child(h,{'state.json':b'{}'},'offline-wire',capability=object()),c)
+            state.advance(h,c,capability=object())
+        commit=next(payload for method,path,payload in calls if method=='POST' and path=='/git/commits')
+        self.assertEqual(commit['parents'],[h]);self.assertEqual(calls[-1][2],{'sha':c,'force':False})
+        ids=[]
+        class Cap:oidc_token='synthetic-oidc'
+        with patch('pipeline.pages_transport.require_remote',return_value=None):
+            did=GitHubPages(api).create_once({'phase':'DEPLOY_REQUESTED','deploymentId':None,'pagesArtifactId':99,'key':'f'*64},ids.append,Cap())
+        self.assertEqual(did,'17');self.assertEqual(ids,['17'])
+        pages=[x for x in calls if x[0]=='POST' and x[1]=='/pages/deployments'];self.assertEqual(len(pages),1)
+        self.assertEqual(pages[0][2]['pages_build_version'],'f'*40)
+        self.assertEqual(self.network_spy.call_count,0)
