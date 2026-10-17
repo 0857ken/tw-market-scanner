@@ -100,7 +100,9 @@ class PublicationCoordinator:
                 'Baseline payload must match successful archived acquisition')
         if kind == 'publish':
             require(r['kind'] == 'publish' and r['baseline'] == baseline.binding, 'Candidate not from this successful baseline')
-            from .daily_release import gate
+            from .daily_release import gate,target_day
+            require(target_day(self.clock(),r['slot']['targetDate'])==r['slot']['targetDate'] and
+                    self.clock()<=datetime.fromisoformat(r['slot']['deadline']), 'Original publication slot expired')
             payload = json.loads(unpack(files['acquisition-state.zip'])['market.json'])
             require(gate(payload, baseline.payload, r['slot']['targetDate']) == 'candidate', 'Independent publication data gate')
         self.verifier.verify(baseline.closure['site.zip'])
@@ -109,6 +111,7 @@ class PublicationCoordinator:
               'candidateZipSha256': r['output']['siteZipSha256'], 'receiptSha256': sha(files['candidate-receipt.json']),
               'sourceRunId': r['provenance']['sourceRunId'], 'runAttempt': r['provenance']['runAttempt'],
               'approval': auth, 'deploymentId': None, 'pagesArtifactId': pages_artifact_id,
+              'dispatchDeadline':r['slot']['deadline'] if kind=='publish' else auth['expires_at'],
               'statusReads': 0, 'preparedAt': self.clock().isoformat(), 'dispatchStartedAt': None}
         self.checkpoint('prepare.before')
         prepared = self._transition(snap, tx, 'PREPARED', files={'approvals/'+sha(canonical(auth))+'.json': canonical(auth)})
@@ -138,14 +141,18 @@ class PublicationCoordinator:
         require(self._owned.get(key) == fence, 'Restarted worker must reconcile; no automatic create')
         snap, tx = self._active(key, fence, {'PREPARED'})
         require(self.clock() < datetime.fromisoformat(tx['approval']['expires_at']), 'Approval expired before dispatch')
+        require(self.clock() <= datetime.fromisoformat(tx['dispatchDeadline']), 'Original dispatch deadline expired')
         old_files, _ = self.archive.load(tx['baselineArchive'])
         self.verifier.verify(old_files['site.zip'])
+        require(self.clock() <= datetime.fromisoformat(tx['dispatchDeadline']), 'Deadline crossed during baseline verification')
         self.checkpoint('request.before_intent')
         snap = self._transition(snap, tx, 'DEPLOY_REQUESTED', {'dispatchStartedAt': self.clock().isoformat()})
         tx = snap.state['activeTransaction']
         self.checkpoint('request.after_intent')
         latest, active = self._active(key, fence, {'DEPLOY_REQUESTED'})
         require(latest.head == snap.head and active['deploymentId'] is None, 'Dispatch intent changed before Pages POST')
+        require(self.clock()<=datetime.fromisoformat(active['dispatchDeadline']) and
+                self.clock()<datetime.fromisoformat(active['approval']['expires_at']), 'Dispatch authorization/window expired before POST')
 
         def persist(did):
             require(isinstance(did, str) and did, 'Missing Pages ID')

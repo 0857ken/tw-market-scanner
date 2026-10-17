@@ -455,6 +455,16 @@ except CASConflict:sys.exit(3)
                 with patch.object(backend, 'total_bytes', return_value=total), patch.object(backend, 'create') as create:
                     with self.assertRaises(ValueError): ReleaseArchive(backend).archive_candidate(self.fixture.new)
                     create.assert_not_called()
+        c,b,live=self.environment()
+        approval=replace(self.approval(b),expires_at=(NOW+timedelta(days=3)).isoformat())
+        c.clock=lambda:NOW+timedelta(days=2)
+        with self.assertRaises(ValueError):c.prepare_publication(b,self.fixture.new_ref,approval)
+        self.assertEqual(c.store.read().head,b.state_head);self.assertEqual(c.pages.creates,[])
+        c.clock=lambda:NOW
+        tx=c.prepare_publication(b,self.fixture.new_ref,approval)
+        c.clock=lambda:NOW+timedelta(hours=5)
+        with self.assertRaises(ValueError):c.request_pages_once(tx['key'],tx['fence'])
+        self.assertEqual(c.pages.creates,[]);self.assert_pointer(c,b.pointer)
 
     @cases('P10', 'W01', 'W03')
     def test_real_transports_closed_and_legacy_bypass_not_claimed_ready(self):
