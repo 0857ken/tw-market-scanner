@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import {validateMarket} from '../frontend/src/data.js';
 import {getSignals} from '../frontend/src/logic.js';
 import {observationSignals} from '../frontend/src/observation.js';
@@ -27,10 +28,5 @@ for(const scope of ['ALL','TWSE','TPEx']){
   assert.equal(s.hits.length,0);assert.equal(s.creditNow,null);
   assert.ok(s.latest.every(r=>r.ma240===null&&r.breakout240===false));
 }
-for(const workflow of ['ci.yml','deploy.yml']){
-  const body=fs.readFileSync(`.github/workflows/${workflow}`,'utf8');
-  assert.ok(!/^\s+schedule:/m.test(body));
-  assert.ok(!/uses:\s*actions\/(?:deploy-pages|configure-pages|upload-pages-artifact)@/.test(body));
-  assert.ok(!/pages:\s*write|id-token:\s*write/.test(body));
-}
-console.log('RC inventory, no secrets matching token patterns, approved profile, frozen signals and no-publication workflow audit passed. Pattern scan is not a guarantee of absence of all secrets.');
+execFileSync(process.env.PYTHON||'python3',['-m','scripts.audit_workflows'],{stdio:'inherit'});
+console.log('RC inventory, approved profile and frozen signals passed. All workflows audited; legacy manual Pages release remains byte-pinned. Token pattern scan is not a guarantee of absence of all secrets.');

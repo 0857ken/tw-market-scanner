@@ -1,8 +1,14 @@
 # 台股掃描器 3.0
 
-獨立 React／Vite 前端與 Python 盤後資料管線，儲存庫為 `0857ken/tw-market-scanner`。Stage 3D 位於 feature 分支與 Draft PR #1，尚未合併或發布網站。不讀取或修改 `txf-tracker`。
+> Stage 4C-2B 已加入 [持久版本／安全發布的離線實作](docs/STAGE4C2B_IMPLEMENTATION.md)，依 [4C-2A 規格](docs/STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md) 延伸。正式 Releases／state／發布權限仍未初始化；所有官方更新入口必須先驗 successfulPointer，缺 state 即停止。以下舊候選命令屬歷史背景；不得用 checkout fixture 作正式 baseline。
 
-目前母體為 **1,085 檔 TWSE 上市與 893 檔 TPEx 上櫃普通股**，最新行情日為 **2026-10-12**；TWSE公司名單日10/11、TPEx公司名單日10/12。TWSE以資料集11549直接列示的當日CSV驗證，避免OpenAPI延遲。排除 ETF、ETN、權證、TDR 等非普通股。加權指數、TX 法人淨未平倉與融資各有獨立資料日；產檔日期不代表行情已更新。完整結果與限制見 [Stage 3D 驗收報告](docs/STAGE3D_AUDIT.md)。
+正式盤後觀察站：**https://0857ken.github.io/tw-market-scanner/**。Stage 4B-2 已合併 PR #1，使用核准固定版本 `4b1-rc1` 首次發布（Run `38496725153`）。正式快照的 TWSE／TPEx 行情日均為 **2026-10-13**，不是即時行情；TWSE 名單為10/12、29檔缺有效價格、交易日曆部分驗證、Safari 實機尚待驗收。正式版未啟用長期均線、突破、還原價格、回測、信用利差或 TWSE T86。
+
+Stage 4C-1 建立每日更新候選架構與非正式 dry-run：**沒有 schedule、没有正式網站更新權限、不寫 market-data、不合併 main**。獨立 React／Vite 前端與 Python 盤後資料管線；不讀取或修改 `txf-tracker`。目前母體為1,085檔上市、893檔上櫃普通股，有效價格1,949檔（98.53%）。來源日期與抓取時間分開顯示，延遲不補假資料。
+
+見 [Stage 4C-1 維運、架構與驗收](docs/STAGE4C1_OPERATIONS.md)。
+
+**Stage 4C-1B（待審查，尚未 push）：** 候選更新安全補強與限制見 [本輪說明](docs/STAGE4C1B_REVIEW.md)。正式 baseline/state、跨系統協調及排程僅有 [Stage 4C-2 介面設計](docs/STAGE4C2_INTERFACE_DESIGN.md)，尚未實作。
 
 ## 執行
 
@@ -18,8 +24,7 @@ npm run preview
 開啟 `http://127.0.0.1:4173/tw-market-scanner/`。這是本機預覽，並非公開網址。開發模式使用 `npm run dev`，依終端顯示的 localhost 網址開啟。
 
 ```bash
-npm run data           # 取得官方盤後資料，允許有日期的過期快照
-npm run data:strict    # 關鍵來源落後或失敗時結束碼非 0
+npm run data:candidate -- --help  # 唯一候選入口；舊 data/data:strict 是相同入口別名
 npm run build         # 驗證資料後同步前端，不會自動發布
 ```
 
@@ -28,7 +33,7 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 ## 資料與限制
 
 - `schemaVersion: 2`；缺值使用 `null`，不補 0。`mode: live` 表示實際來源快照，**不表示即時行情或最新交易日**。
-- 上市僅觀測到 3 日、上櫃 2 日行情；MA20／60／120／240、均線廣度及 N 日突破維持缺資料／暖機。300 日回補尚未完成，沒有捏造歷史。
+- 上市僅觀測到 4 日、上櫃 3 日行情；MA20／60／120／240、均線廣度及 N 日突破維持缺資料／暖機。300 日回補尚未完成，沒有捏造歷史。
 - 股價尚未還原除權息與分割，只供未還原價格研究；沒有驗證過的回測績效。母體是目前公司名單，非歷史時點母體。
 - TWSE T86 公開轉載授權未核實，不抓取、不載入、不公開明細。TPEx 開放授權法人快照可獨立研究，但不能冒充完整上市櫃法人資料，連續訊號仍須足夠歷史。
 - HYG／SHY／SPY 預設停用；信用燈號依原始截圖還原，規則仍待確認，不採用 v2 的 0.25／0.35 作為原始規則。請將 [回覆清單](docs/QUESTIONS_TO_RETURN.md) 交給原作者。
@@ -52,7 +57,7 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 
 `START_HERE.md`、`WORK_TASK.md`、`docs/INTEGRATION_RISKS.md` 是原始交接指令。原 `data-pipeline/` 與巢狀 workflows 已在此分支整合移除；原始版本仍保存在 Git baseline。以本 README 與驗收紀錄判斷現在狀態。
 
-**額外月費目標 NT$0；本次付費項目為零。** 自動更新與 Pages 預設關閉，僅允許指定公開 repo 的標準 Ubuntu runner；公開建庫及正式網站發布各需使用者明確核准。
+**額外月費目標 NT$0；本次付費項目為零。** 正式 Pages 已上線；每日自動更新仍關閉，僅允許指定公開 repo 的標準 Ubuntu runner；公開建庫及正式網站發布各需使用者明確核准。
 
 ## Stage 3B（2026-10-12）
 
@@ -67,7 +72,7 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 python -m pipeline.daily --data-dir /path/to/isolated-data --twse-current-csv
 ```
 
-Stage 3C使用此隔離流程；原 `pipeline.run` 為較廣的舊流程，本階段未用它對外抓取。
+以上是歷史 Stage 3C 指令。Stage 4C-1B 已停用 `pipeline.run`／`pipeline.daily` 的直接 CLI，避免誤更新。現在只使用 `pipeline.daily_release`；須明確指定新的 output、target-date、run-id，預設離線，只有加上 `--fetch-current` 才會請求官方來源。參見本輪說明，不在唯讀稽核或離線測試中抓行情。
 
 [品質報表](data/quality.json) · [更新及CSV來源證據](data/stage3c-update-manifest.json) · [離線重播證據](data/stage3c-replay-evidence.json) · [TWSE詢問信草稿](docs/TWSE_LICENSE_INQUIRY_DRAFT.md) · [TPEx詢問信草稿](docs/TPEX_LICENSE_INQUIRY_DRAFT.md)。兩封信未寄出，歷史批量及價格還原尚未核准。
 

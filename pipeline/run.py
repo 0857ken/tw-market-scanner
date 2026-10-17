@@ -9,6 +9,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from urllib.error import HTTPError
 
 from . import parsers
 from .common import ROOT, TPE, LICENSE, get_json, calendar_rows, expected_session, read_json, write_json, timestamp
@@ -89,6 +90,8 @@ def collect(data_dir, sources, module, parser, now, params=None, fetcher=None):
                            'sha256': last['sha256'] if last else None,
                            'rowCount': len(last['rows']) if last else 0,
                            'error': str(exc)}
+        if isinstance(exc, HTTPError):
+            sources[module]['httpStatus'] = exc.code
         print(f'{module}: ERROR {exc}', flush=True)
         return last
 
@@ -286,9 +289,4 @@ def run(data_dir=ROOT / 'data', strict=False, credit_file=None, now=None):
 
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--strict', action='store_true', help='Nonzero exit when critical modules are stale or failed')
-    ap.add_argument('--data-dir', type=Path, default=ROOT / 'data')
-    ap.add_argument('--credit-file', type=Path)
-    args = ap.parse_args()
-    sys.exit(run(args.data_dir, args.strict, args.credit_file))
+    sys.exit('Legacy acquisition CLI disabled for observation candidates. Use python -m pipeline.daily_release --help. No request made.')

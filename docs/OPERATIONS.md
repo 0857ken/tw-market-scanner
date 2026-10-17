@@ -1,3 +1,5 @@
+> 正式站已於Stage 4B-2上線，舊文以下為歷史紀錄。每日排程仍未啟用。最新為 [Stage 4C-2B 離線實作](STAGE4C2B_IMPLEMENTATION.md)，依 [4C-2A 規格](STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md)；遠端 Releases／state／Pages 權限仍未初始化。官方更新只可從 successfulPointer 驗證 baseline，舊 pipeline.run／daily CLI 與 daily_release 直接抓取入口均已停用。
+
 # 開發、維運與發布
 
 ## 本機與分支
