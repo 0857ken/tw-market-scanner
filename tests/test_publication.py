@@ -151,7 +151,7 @@ class PublicationTests(unittest.TestCase):
                 legacy_import_plan(self.fixture.old_site, root, self.fixture.provenance('900'), self.fixture.slot('2026-10-13'))
             self.assertFalse((Path(t)/'state.json').exists())
 
-    @cases('B07', 'B08', 'A05')
+    @cases('B07', 'A05')
     def test_complete_state_survives_temp_cleanup_and_distinguishes_response_digest(self):
         files = unpack(self.fixture.new['acquisition-state.zip'])
         self.assertEqual(json.loads(files['market.json'])['asOf'], '2026-10-14')
@@ -588,9 +588,16 @@ except CASConflict:sys.exit(3)
         commit=next(payload for method,path,payload in calls if method=='POST' and path=='/git/commits')
         self.assertEqual(commit['parents'],[h]);self.assertEqual(calls[-1][2],{'sha':c,'force':False})
         ids=[]
-        class Cap:oidc_token='synthetic-oidc'
-        with patch('pipeline.pages_transport.require_remote',return_value=None):
-            did=GitHubPages(api).create_once({'phase':'DEPLOY_REQUESTED','deploymentId':None,'pagesArtifactId':99,'key':'f'*64},ids.append,Cap())
+        class Cap:
+            oidc_token='synthetic-oidc'
+            site_zip=self.fixture.new['site.zip']
+        pages_adapter=GitHubPages(api)
+        proof={'artifactId':99,'siteZipSha256':sha(Cap.site_zip),'producer':{'runId':1001,'runAttempt':1,'headSha':self.fixture.commit,'workflowPath':'.github/workflows/package-daily.yml'}}
+        transaction={'phase':'DEPLOY_REQUESTED','deploymentId':None,'pagesArtifactId':99,'key':'f'*64,
+                     'candidateZipSha256':sha(Cap.site_zip),'pagesArtifactProof':proof,'pagesArtifactProofSha256':sha(canonical(proof))}
+        with patch('pipeline.pages_transport.require_remote',return_value=None), patch.object(pages_adapter,'verify_artifact',return_value=proof) as checked:
+            did=pages_adapter.create_once(transaction,ids.append,Cap())
+            checked.assert_called_once_with(99,Cap.site_zip,proof['producer'])
         self.assertEqual(did,'17');self.assertEqual(ids,['17'])
         pages=[x for x in calls if x[0]=='POST' and x[1]=='/pages/deployments'];self.assertEqual(len(pages),1)
         self.assertEqual(pages[0][2]['pages_build_version'],'f'*40)

@@ -23,14 +23,17 @@ class OfflineApproval:
     expected_zip: str
     expires_at: str
     reference: str
+    code_sha: str
+    publisher_sha: str
     seal: object
 
 
-def offline_approval(kind, receipt, baseline, expires_at, reference='offline-test-owner'):
+def offline_approval(kind, receipt, baseline, expires_at, reference='offline-test-owner', *, publisher_sha=None):
     return OfflineApproval(kind, receipt['output']['siteZipSha256'], sha(canonical(receipt)),
                            receipt['frontend']['seedZipSha256'], baseline.state_head,
                            baseline.pointer['generation'], baseline.pointer['publishedZipSha256'],
-                           expires_at, reference, _OFFLINE_SEAL)
+                           expires_at, reference, receipt['provenance']['processorCommit'],
+                           publisher_sha or receipt['provenance']['processorCommit'], _OFFLINE_SEAL)
 
 
 class PublicationCoordinator:
@@ -45,10 +48,15 @@ class PublicationCoordinator:
         require(isinstance(approval, OfflineApproval) and approval.seal is _OFFLINE_SEAL and
                 approval.kind == kind and approval.zip_sha == receipt['output']['siteZipSha256'] and
                 approval.receipt_sha == sha(canonical(receipt)) and approval.seed_sha == receipt['frontend']['seedZipSha256'] and
+                approval.code_sha == receipt['provenance']['processorCommit'] and
                 approval.expected_head == baseline.state_head and approval.expected_generation == baseline.pointer['generation'] and
                 approval.expected_zip == baseline.pointer['publishedZipSha256'] and approval.reference and
                 self.clock() < datetime.fromisoformat(approval.expires_at), 'Missing/expired/exact approval mismatch')
-        return {k: v for k, v in asdict(approval).items() if k != 'seal'}
+        from .publication_contract import digest
+        digest(approval.publisher_sha, 40)
+        require(kind != 'publish' or approval.publisher_sha == approval.code_sha, 'Publish code differs from approved producer')
+        return {**{k: v for k, v in asdict(approval).items() if k != 'seal'},
+                'schemaVersion': 1, 'authorityKind': 'offline-test', 'authorizedAt': self.clock().isoformat()}
 
     def completed(self, key):
         snap = self.store.read()
@@ -82,13 +90,20 @@ class PublicationCoordinator:
         return self.store.cas_transition(snap.head, snap.state['successfulPointer']['generation'], key,
                     None if phase == 'PREPARED' else fence, mutate)
 
-    def prepare_publication(self, baseline, archive_ref, approval, *, kind='publish', pages_artifact_id=None):
+    def prepare_publication(self, baseline, archive_ref, approval, *, kind='publish', pages_artifact_id=None, pages_artifact_run=None):
         files, index = self.archive.load(archive_ref); r = verify_closure(files)
         key = operation_key(baseline.pointer, r['output']['siteZipSha256'], r['slot']['targetDate'], kind)
         done = self.completed(key)
         if done:
             return {'completed': done, 'key': key}
         auth = self._authorize(approval, r, baseline, kind)
+        artifact_proof = None
+        if pages_artifact_id is not None:
+            require(pages_artifact_run and pages_artifact_run['headSha'] == auth['publisher_sha'],
+                    'Exact approved Pages artifact producer required')
+            artifact_proof = self.pages.verify_artifact(pages_artifact_id, files['site.zip'], pages_artifact_run)
+        else:
+            require(self.pages.offline, 'Real Pages requires bound artifact bytes')
         snap = self.store.read(); s = snap.state
         require(snap.head == baseline.state_head and s['successfulPointer'] == baseline.pointer, 'Stale baseline state head')
         require(not s['control']['halted'] and s['activeTransaction'] is None, 'Publisher active/halted; no lease expiry unlock')
@@ -111,6 +126,7 @@ class PublicationCoordinator:
               'candidateZipSha256': r['output']['siteZipSha256'], 'receiptSha256': sha(files['candidate-receipt.json']),
               'sourceRunId': r['provenance']['sourceRunId'], 'runAttempt': r['provenance']['runAttempt'],
               'approval': auth, 'deploymentId': None, 'pagesArtifactId': pages_artifact_id,
+              'pagesArtifactProof': artifact_proof, 'pagesArtifactProofSha256': sha(canonical(artifact_proof)) if artifact_proof else None,
               'dispatchDeadline':r['slot']['deadline'] if kind=='publish' else auth['expires_at'],
               'statusReads': 0, 'preparedAt': self.clock().isoformat(), 'dispatchStartedAt': None}
         self.checkpoint('prepare.before')
@@ -231,6 +247,8 @@ class PublicationCoordinator:
                 'runAttempt': r['provenance']['runAttempt'], 'deploymentId': tx['deploymentId'],
                 'previous': {k: old[k] for k in ('generation', 'publishedZipSha256', 'successRecordSha256')}}
             success = {'schemaVersion': 1, 'key': key, 'kind': tx['kind'], 'pointer': pointer,
+                       'baseline': tx['baseline'],
+                       'pagesArtifactProof': tx['pagesArtifactProof'], 'pagesArtifactProofSha256': tx['pagesArtifactProofSha256'],
                        'deployment': status, 'liveEvidenceSha256': sha(eb), 'approvalSha256': sha(canonical(tx['approval'])),
                        'at': self.clock().isoformat(), 'rollbackOf': old['generation'] if tx['kind'] == 'manual-restore' else None}
             success_body = canonical(success); pointer = {**pointer, 'successRecordSha256': sha(success_body)}

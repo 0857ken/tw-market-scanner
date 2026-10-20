@@ -41,7 +41,7 @@ def main():
     parser.add_argument('--all', action='store_true', help='Include all pre-existing Python regressions')
     parser.add_argument('--output', type=Path, default=Path('test-results/stage4c2b-matrix.json'))
     args = parser.parse_args()
-    suite = unittest.defaultTestLoader.discover('tests') if args.all else unittest.defaultTestLoader.loadTestsFromName('tests.test_publication')
+    suite = unittest.defaultTestLoader.discover('tests') if args.all else unittest.defaultTestLoader.loadTestsFromNames(['tests.test_publication','tests.test_publication_p1'])
     result = unittest.TextTestRunner(verbosity=2, resultclass=MatrixResult).run(suite)
     cases = {i: {'status': 'PASS' if result.matrix.get(i) and all(x['status']=='PASS' for x in result.matrix[i]) else 'BLOCKED' if not result.matrix.get(i) else 'FAIL',
                  'evidence': result.matrix.get(i, [])} for i in sorted(EXPECTED)}

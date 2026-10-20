@@ -56,12 +56,22 @@ def bootstrap_files(closure, ref, index, live):
         'archive': ref, 'frontendPinSha256': r['frontend']['frontendPinSha256'], 'seedZipSha256': r['frontend']['seedZipSha256'],
         'sourceIdentitySha256': r['output']['sourceIdentitySha256'], 'sourceRunId': r['provenance']['sourceRunId'],
         'runAttempt': r['provenance']['runAttempt'], 'deploymentId': 'offline-genesis', 'previous': None}
+    approval = {'schemaVersion': 1, 'authorityKind': 'offline-test', 'kind': 'legacy-import',
+        'zip_sha': sha(closure['site.zip']), 'receipt_sha': sha(closure['candidate-receipt.json']),
+        'seed_sha': r['frontend']['seedZipSha256'], 'code_sha': r['provenance']['processorCommit'],
+        'publisher_sha': r['provenance']['processorCommit'],
+        'deployment_id': 'offline-genesis',
+        'expected_head': None, 'expected_generation': None, 'expected_zip': None,
+        'authorizedAt': NOW.isoformat(), 'expires_at': EXPIRES, 'reference': 'offline-fixture-owner'}
+    ab = canonical(approval)
     success = {'schemaVersion': 1, 'key': sha(b'offline-genesis'), 'kind': 'legacy-import', 'pointer': pointer,
+               'baseline': None, 'at': NOW.isoformat(), 'approvalSha256': sha(ab),
                'deployment': {'id': 'offline-genesis', 'rawStatus': 'succeed', 'status': 'success'}, 'liveEvidenceSha256': sha(eb)}
     sb = canonical(success); pointer = {**pointer, 'successRecordSha256': sha(sb)}
     state = {'schemaVersion': 1, 'repositoryId': 1412557806, 'stateRevision': 0, 'fenceCounter': 0,
              'control': {'halted': False, 'reason': None}, 'successfulPointer': pointer, 'activeTransaction': None}
     return {'state.json': canonical(state), 'successes/g0.json': sb, 'live-evidence/'+sha(eb)+'.json': eb,
+            'approvals/'+sha(ab)+'.json': ab,
             'receipts/'+sha(closure['candidate-receipt.json'])+'.json': closure['candidate-receipt.json'],
             'indexes/'+ref['packageIndexSha256']+'.json': canonical(index)}
 

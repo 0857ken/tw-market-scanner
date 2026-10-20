@@ -27,7 +27,7 @@ class VerifiedBaseline:
         return Path(destination)
 
 
-def _success_chain(snapshot):
+def _success_chain(snapshot, *, offline, trusted_approvals=None):
     current = snapshot.state['successfulPointer']
     expected = current['successRecordSha256']
     for generation in range(current['generation'], -1, -1):
@@ -35,6 +35,17 @@ def _success_chain(snapshot):
         require(sha(body) == expected, 'SuccessRecord chain digest mismatch')
         record = json.loads(body)
         require(record['schemaVersion'] == 1 and record['pointer']['generation'] == generation, 'Success generation mismatch')
+        receipt_sha = record['pointer']['receiptSha256']
+        receipt_bytes = snapshot.files['receipts/'+receipt_sha+'.json']
+        require(sha(receipt_bytes) == receipt_sha, 'Historical success receipt corrupted')
+        from .success_approval import verify as verify_approval
+        from .publication_contract import validate_receipt
+        saved_approval = verify_approval(snapshot, record, validate_receipt(json.loads(receipt_bytes)),
+                        offline=offline, trusted_approvals=trusted_approvals)
+        if generation and not offline:
+            from .pages_artifact import validate_saved_proof
+            validate_saved_proof(record.get('pagesArtifactProof'), record.get('pagesArtifactProofSha256'),
+                                 json.loads(receipt_bytes), publisher_sha=saved_approval['publisher_sha'])
         if generation == current['generation']:
             require(record['pointer'] == {k: v for k, v in current.items() if k != 'successRecordSha256'}, 'Pointer/SuccessRecord differs')
         previous = record['pointer'].get('previous')
@@ -48,11 +59,12 @@ def _success_chain(snapshot):
     return json.loads(snapshot.files['successes/g'+str(current['generation'])+'.json'])
 
 
-def load_verified_baseline(store, archive, verifier, expected_published_zip_sha256, expected_generation, *, diagnostic=False):
+def load_verified_baseline(store, archive, verifier, expected_published_zip_sha256, expected_generation, *, diagnostic=False, trusted_approvals=None):
     snapshot = store.read(); state = snapshot.state; p = state['successfulPointer']
     require(p['publishedZipSha256'] == expected_published_zip_sha256 and p['generation'] == expected_generation, 'Expected successful baseline differs')
     require(diagnostic or (not state['control']['halted'] and state['activeTransaction'] is None), 'Unresolved/halted publication blocks baseline work')
-    record = _success_chain(snapshot)
+    record = _success_chain(snapshot, offline=store.backend.offline and archive.backend.offline,
+                            trusted_approvals=trusted_approvals)
     files, index = archive.load(p['archive'])
     r = verify_closure(files, p['receiptSha256'])
     require(sha(files['site.zip']) == p['publishedZipSha256'] and sha(files['acquisition-state.zip']) == p['acquisitionZipSha256'] and

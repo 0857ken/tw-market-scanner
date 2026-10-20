@@ -23,13 +23,14 @@ class GitHubAPI:
         require(method in ('GET','POST','PATCH'), 'HTTP mutation verb not supported')
         upload = path.startswith('uploads:')
         relative = path.removeprefix('uploads:')
-        require(relative.startswith(('/git/', '/compare/', '/releases', '/pages/deployments', '/actions/runs/')) and
+        require(relative.startswith(('/git/', '/compare/', '/releases', '/pages/deployments', '/actions/runs/', '/actions/artifacts/')) and
                 '..' not in relative and '://' not in relative and '\\' not in relative, 'Repository API path not allowed')
         if upload:
             import re
             require(method=='POST' and isinstance(payload,bytes) and
                     re.fullmatch(r'/releases/[0-9]+/assets\?name=[A-Za-z0-9_.%-]+',relative),'Invalid asset upload route')
         require(method!='GET' or payload is None,'GET cannot carry mutable payload')
+        require(not relative.startswith('/actions/artifacts/') or method == 'GET', 'Artifact access is read-only')
         url = ('https://uploads.github.com' if upload else 'https://api.github.com')+'/repos/'+REPOSITORY+relative
         headers = {'Accept':'application/octet-stream' if binary else 'application/vnd.github+json',
                    'X-GitHub-Api-Version':'2026-03-10', 'User-Agent':'tw-market-scanner-read-only'}
@@ -46,7 +47,9 @@ class GitHubAPI:
             if method!='GET' or not binary or exc.code != 302:
                 raise  # 403/429, unknown errors and GET timeouts never retry.
             target = exc.headers.get('Location', ''); parsed = urlsplit(target)
-            require(parsed.scheme == 'https' and parsed.hostname in ('release-assets.githubusercontent.com', 'objects.githubusercontent.com') and
+            artifact_redirect = relative.startswith('/actions/artifacts/') and relative.endswith('/zip') and parsed.hostname and parsed.hostname.endswith('.blob.core.windows.net')
+            require(parsed.scheme == 'https' and (parsed.hostname in ('release-assets.githubusercontent.com', 'objects.githubusercontent.com') or artifact_redirect) and
+                    parsed.port in (None, 443) and
                     not parsed.username and not parsed.password, 'Unapproved asset redirect')
             # Signed asset request receives no Authorization or cookies.
             response = self.opener(Request(target, headers={'Accept':'application/octet-stream'}), timeout=15)

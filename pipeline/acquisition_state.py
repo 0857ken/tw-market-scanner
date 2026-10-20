@@ -40,6 +40,8 @@ def allowed(name):
 def validate_files(files):
     require({'market.json', 'source-state.json'} <= files.keys(), 'Missing acquisition state')
     payload = json.loads(files['market.json']); validate(payload)
+    from .acquisition_validation import metadata, replay
+    metadata(files, payload)
     require(json.loads(files['source-state.json'])['sources'] == payload['sources'], 'Source-state differs from internal market')
     require(not payload['creditHistory'] and payload['creditRule']['status'] == 'pending', 'Unapproved credit closure')
     policy = json.loads(policy_files()['source-publication.json'])['modules']
@@ -54,6 +56,8 @@ def validate_files(files):
         require(name == 'raw/' + module + '_' + snap['date'] + '.json', 'Snapshot filename binding')
         require(set(snap) == {'date', 'fetchedAt', 'license', 'module', 'rows', 'sha256', 'url'}, 'Unapproved snapshot metadata')
         require(all(set(r) <= set(ROWS[module].split()) for r in snap['rows']), 'Unapproved parsed fields, including contacts')
+        require(all(not isinstance(v, (dict, list)) for r in snap['rows'] for v in r.values()),
+                'Nested parsed fields not approved')
         from .run import SOURCES
         from .current_csv import URL
         official = 'https://www.tpex.org.tw/openapi/v1/tpex_exright_daily' if module == 'tpexEvents' else SOURCES[module][1]
@@ -82,6 +86,7 @@ def validate_files(files):
         for n, b in files.items():
             p = Path(t)/n; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b)
         verify_snapshot_links(payload, t)
+        replay(payload, t)
     return payload
 
 
@@ -99,14 +104,16 @@ def pack(data_dir):
                 files[name] = p.read_bytes()
     validate_files(files)
     records = file_inventory(files)
+    frozen_code = code_inventory()
+    license_policy_sha = sha(policy_files()['source-publication.json'])
     for n in records:
         if n.startswith('raw/'):
             s = json.loads(files[n])
             records[n].update(module=s['module'], date=s['date'], sourceUrl=s['url'],
                               responseSha256=s['sha256'], parsedSnapshotFileSha256=sha(files[n]), responseBodyArchived=False,
-                              licensePolicySha256=sha(policy_files()['source-publication.json']), parserSha256=code_inventory()['pipeline/parsers.py'])
+                              licensePolicySha256=license_policy_sha, parserSha256=frozen_code['pipeline/parsers.py'])
     files['inventory.json'] = canonical({'schemaVersion': 1, 'files': records,
-        'excludedNonInputs': ['runs/*', 'stage*-*.json'], 'codeInventory': code_inventory()})
+        'excludedNonInputs': ['runs/*', 'stage*-*.json'], 'codeInventory': frozen_code})
     body = zip_bytes(files)
     unpack(body)
     return body
@@ -115,17 +122,24 @@ def pack(data_dir):
 def unpack(body, destination=None):
     files = read_zip(body, allowed)
     inventory = json.loads(files.pop('inventory.json'))
+    from .acquisition_validation import fields
+    fields(inventory, {'schemaVersion', 'files', 'excludedNonInputs', 'codeInventory'}, 'inventory')
     require(inventory['schemaVersion'] == 1 and inventory['excludedNonInputs'] == ['runs/*','stage*-*.json'], 'Unknown acquisition inventory contract')
     records = inventory['files']
     verify_inventory(files, {n: {k: r[k] for k in ('bytes', 'sha256')} for n, r in records.items()})
-    require(inventory['codeInventory'] == code_inventory(), 'Processor/parser contract changed; explicit migration needed')
+    frozen_code = code_inventory()
+    license_policy_sha = sha(policy_files()['source-publication.json'])
+    require(inventory['codeInventory'] == frozen_code, 'Processor/parser contract changed; explicit migration needed')
     for n, r in records.items():
+        fields(r, {'bytes', 'sha256'} | ({'module', 'date', 'sourceUrl', 'responseSha256',
+               'parsedSnapshotFileSha256', 'responseBodyArchived', 'licensePolicySha256', 'parserSha256'}
+               if n.startswith('raw/') else set()), 'inventory record')
         if n.startswith('raw/'):
             s = json.loads(files[n])
             require(r['parsedSnapshotFileSha256'] == sha(files[n]) and r['responseSha256'] == s['sha256'] and
                     r['responseBodyArchived'] is False and r['module'] == s['module'] and r['date'] == s['date'] and
-                    r['sourceUrl'] == s['url'] and r['licensePolicySha256'] == sha(policy_files()['source-publication.json']) and
-                    r['parserSha256'] == code_inventory()['pipeline/parsers.py'], 'Parsed/response provenance mismatch')
+                    r['sourceUrl'] == s['url'] and r['licensePolicySha256'] == license_policy_sha and
+                    r['parserSha256'] == frozen_code['pipeline/parsers.py'], 'Parsed/response provenance mismatch')
     validate_files(files)
     if destination is not None:
         root = Path(destination); root.mkdir(parents=True, exist_ok=False)

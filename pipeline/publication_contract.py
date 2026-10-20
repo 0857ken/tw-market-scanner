@@ -106,6 +106,19 @@ def operation_key(baseline, site_sha, target, kind='publish'):
 
 
 def validate_receipt(r):
+    from .acquisition_validation import fields
+    fields(r, {'schemaVersion', 'repository', 'repositoryId', 'environment', 'profile', 'kind', 'baseline',
+               'slot', 'provenance', 'policies', 'codeInventory', 'frontend', 'output', 'gate', 'authority'}, 'candidate receipt')
+    fields(r['slot'], {'timezone','targetDate','event','slot','deadline','startedAt'}, 'receipt slot')
+    fields(r['provenance'], {'sourceRunId','runAttempt','workflowPath','status','conclusion','codeSha','processorCommit',
+                            'inputSchemaVersion','parserSha256','schemaSha256','evidenceKind'}, 'receipt provenance')
+    require(all(not isinstance(v, (dict, list)) for obj in (r['slot'], r['provenance']) for v in obj.values()),
+            'Nested receipt slot/provenance not approved')
+    fields(r['frontend'], {'seedZipSha256','frontendPinSha256','assets','inventoryKind'}, 'receipt frontend')
+    fields(r['output'], {'siteZipSha256','acquisitionZipSha256','supportZipSha256','internalMarketSha256',
+                        'publicMarketSha256','manifestSha256','sourceIdentitySha256','originalReceiptSha256'}, 'receipt output')
+    fields(r['gate'], {'decision','target','observedDates','coverage','runId','productionUnchanged','baselineInputSha256',
+                      'candidatePolicySha256','productionBaselineVerified','baselineBinding','runAttempt','intendedSlot'}, 'receipt gate')
     require(r['schemaVersion'] == 2 and r['repository'] == REPOSITORY and
             r['repositoryId'] == REPOSITORY_ID and r['environment'] == ENVIRONMENT and
             r['profile'] == 'observation-only', 'Receipt identity mismatch')
@@ -138,12 +151,15 @@ def validate_receipt(r):
     require(datetime.fromisoformat(r['slot']['startedAt']) <= datetime.fromisoformat(r['slot']['deadline']), 'Expired original slot')
     if r['kind'] == 'publish':
         b = r['baseline']
+        fields(b, {'generation','publishedZipSha256','receiptSha256','acquisitionZipSha256','stateHead'}, 'receipt baseline')
+        fields(r['gate']['observedDates'], {'TWSE','TPEx'}, 'receipt market dates')
         positive(b['generation'], zero=True)
         for k in ('publishedZipSha256', 'receiptSha256', 'acquisitionZipSha256'):
             digest(b[k])
         digest(b['stateHead'], 40)
         require(r['gate']['decision'] == 'candidate' and r['slot']['targetDate'] == r['gate']['target'], 'Noncandidate receipt')
     else:
+        require(set(r['gate']) == {'decision'}, 'Unknown legacy gate fields')
         require(r['baseline'] is None and r['gate']['decision'] == 'legacy-import', 'Legacy cannot invent a baseline')
     return r
 

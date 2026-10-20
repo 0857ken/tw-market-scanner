@@ -73,6 +73,8 @@ def verify_closure(files, expected_receipt_sha=None):
     internal_files = acquisition.unpack(files['acquisition-state.zip']); p = json.loads(internal_files['market.json'])
     require(sha(internal_files['market.json']) == out['internalMarketSha256'] and identity(p) == out['sourceIdentitySha256'], 'Internal/source identity mismatch')
     projection = json.loads(support['projection.json']); now = datetime.fromisoformat(projection['effectiveAt'])
+    from .acquisition_validation import fields
+    fields(projection, {'kind','effectiveAt','runId'}, 'support projection')
     require(projection['kind'] == r['kind'] and projection['runId'] == str(r['provenance']['sourceRunId']), 'Projection provenance mismatch')
     m = json.loads(public['release-manifest.json'])
     if r['kind'] == 'legacy-import':

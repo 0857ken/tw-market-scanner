@@ -47,9 +47,21 @@ class GitHubPages:
     def __init__(self, api):
         self.api = api
 
+    def verify_artifact(self, artifact_id, site_zip, expected_run):
+        from .pages_artifact import verify
+        return verify(self.api, artifact_id, site_zip, expected_run)
+
     def create_once(self, transaction, persist_id, capability=None):
         require_remote(capability)
         require(transaction['phase'] == 'DEPLOY_REQUESTED' and transaction['deploymentId'] is None, 'Missing durable dispatch intent')
+        from .publication_contract import canonical, sha
+        proof = transaction.get('pagesArtifactProof')
+        require(proof and proof['artifactId'] == transaction['pagesArtifactId'] and
+                proof['siteZipSha256'] == transaction['candidateZipSha256'] and
+                sha(canonical(proof)) == transaction.get('pagesArtifactProofSha256'), 'Missing bound Pages artifact proof')
+        # Refetch and check the immutable Actions archive at dispatch, not just its ID.
+        current = self.verify_artifact(transaction['pagesArtifactId'], capability.site_zip, proof['producer'])
+        require(current == proof, 'Pages artifact binding changed before dispatch')
         # No retry helper: any ambiguous POST response must become UNKNOWN.
         result = self.api('POST', '/pages/deployments', {
             'artifact_id': transaction['pagesArtifactId'], 'pages_build_version': transaction['key'][:40],
