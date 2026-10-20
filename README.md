@@ -1,6 +1,8 @@
 # 台股掃描器 3.0
 
-> Stage 4C-2B 已加入 [持久版本／安全發布的離線實作](docs/STAGE4C2B_IMPLEMENTATION.md)，依 [4C-2A 規格](docs/STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md) 延伸。正式 Releases／state／發布權限仍未初始化；所有官方更新入口必須先驗 successfulPointer，缺 state 即停止。以下舊候選命令屬歷史背景；不得用 checkout fixture 作正式 baseline。
+> 2026-10-20 維運文件校正：沿用 Draft PR #2 與已完成的 Stage 4C-1B／4C-2B；正式站仍為 `4b1-rc1`。最新證據見 [Stage 4C-1 續行驗收](docs/STAGE4C1_REVALIDATION_20261020.md)。
+
+Stage 4C-2B 已有 [持久版本／安全發布的離線實作](docs/STAGE4C2B_IMPLEMENTATION.md)，依 [4C-2A 規格](docs/STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md) 延伸。4C-2C 已設定 state 專用 ruleset，Release immutability 曾於 10/17 設定；原始 Release、scanner-release-state、g0／successfulPointer 與正式寫入能力仍未初始化／驗收。唯一支援的候選 CLI 是 `pipeline.verified_baseline`，缺 state 即停止；不得用 checkout fixture 作正式 baseline。
 
 正式盤後觀察站：**https://0857ken.github.io/tw-market-scanner/**。Stage 4B-2 已合併 PR #1，使用核准固定版本 `4b1-rc1` 首次發布（Run `38496725153`）。正式快照的 TWSE／TPEx 行情日均為 **2026-10-13**，不是即時行情；TWSE 名單為10/12、29檔缺有效價格、交易日曆部分驗證、Safari 實機尚待驗收。正式版未啟用長期均線、突破、還原價格、回測、信用利差或 TWSE T86。
 
@@ -8,7 +10,7 @@ Stage 4C-1 建立每日更新候選架構與非正式 dry-run：**沒有 schedul
 
 見 [Stage 4C-1 維運、架構與驗收](docs/STAGE4C1_OPERATIONS.md)。
 
-**Stage 4C-1B（待審查，尚未 push）：** 候選更新安全補強與限制見 [本輪說明](docs/STAGE4C1B_REVIEW.md)。正式 baseline/state、跨系統協調及排程僅有 [Stage 4C-2 介面設計](docs/STAGE4C2_INTERFACE_DESIGN.md)，尚未實作。
+**Stage 4C-1B 已提交並通過既有 CI：** `db5e1f41…` 的 Push／PR 各 204 項；後續 `b64eb7d…` 已有 4C-2B 離線實作，Push／PR 各 226 項。沿用 [Draft PR #2](https://github.com/0857ken/tw-market-scanner/pull/2)，未合併。[4C-1B 說明](docs/STAGE4C1B_REVIEW.md) 的「待審查／尚未 push」為提交前歷史紀錄；離線 PASS 不等於正式初始化或發布完成。
 
 ## 執行
 
@@ -63,21 +65,16 @@ npm run build         # 驗證資料後同步前端，不會自動發布
 
 上市／上櫃／合併普通股母體與雙價格欄位已整合，預設經驗證還原價；目前還原價為空、歷史仍不足。未還原突破會受完整事件／交易日驗證門檻保護。詳見 [Stage 3B 稽核、授權、覆蓋率與限制](docs/STAGE3B_AUDIT.md)。此階段未合併或部署，未啟用排程。
 
-## Stage 3C：單次人工更新驗收
+## 歷史 Stage 3C：單次人工更新驗收
 
-新增當日行情、漲跌家數、產業有效樣本與熱力圖；沒有完整均線窗口時不產生突破訊號。同日快照不重寫，來源修訂／錯誤先保留最後有效資料。更新入口不含Git推送、排程或部署：
+新增當日行情、漲跌家數、產業有效樣本與熱力圖；沒有完整均線窗口時不產生突破訊號。同日快照不重寫，來源修訂／錯誤先保留最後有效資料。
 
-```bash
-# 先將data複製到隔離工作目錄；本命令會發出6個官方最新資料請求
-python -m pipeline.daily --data-dir /path/to/isolated-data --twse-current-csv
-```
-
-以上是歷史 Stage 3C 指令。Stage 4C-1B 已停用 `pipeline.run`／`pipeline.daily` 的直接 CLI，避免誤更新。現在只使用 `pipeline.daily_release`；須明確指定新的 output、target-date、run-id，預設離線，只有加上 `--fetch-current` 才會請求官方來源。參見本輪說明，不在唯讀稽核或離線測試中抓行情。
+歷史曾使用 `pipeline.daily --twse-current-csv`；目前 run／daily 的直接 CLI 已停用，`pipeline.daily_release --fetch-current` 也不再是官方候選入口。**只使用 `pipeline.verified_baseline`／`npm run data:candidate`**，先驗精確 successfulPointer、封存閉包與當下 live；缺 state 在金融請求前停止。必要參數與離線演練見 [維運說明](docs/STAGE4C1_OPERATIONS.md)。
 
 [品質報表](data/quality.json) · [更新及CSV來源證據](data/stage3c-update-manifest.json) · [離線重播證據](data/stage3c-replay-evidence.json) · [TWSE詢問信草稿](docs/TWSE_LICENSE_INQUIRY_DRAFT.md) · [TPEx詢問信草稿](docs/TPEX_LICENSE_INQUIRY_DRAFT.md)。兩封信未寄出，歷史批量及價格還原尚未核准。
 
-## Stage 3D：盤後觀察版上線準備
+## 歷史 Stage 3D：盤後觀察版上線準備
 
 [驗收報告](docs/STAGE3D_AUDIT.md) · [正式上線檢查表與Stage 4流程](docs/OBSERVATION_RELEASE_CHECKLIST.md) · [授權矩陣／官方聯絡窗口](docs/DATA_LICENSE_MATRIX.md)。本階段未發布網站、未合併或寄信。
 
-首頁詳細來源／研究限制可展開；資料重新讀取省略憑證、15秒逾時，僅允許本站／GitHub原始資料URL或匯入JSON。打包保留CSP與相對Pages路徑，CI驗證真實資料資源並提供一天的手機截圖artifact。正式CDN／HTTPS與實機驗收仍須在Stage 4完成；現有完整日曆發布門檻未解除。
+首頁詳細來源／研究限制可展開；資料重新讀取省略憑證、15秒逾時，僅允許本站／GitHub原始資料URL或匯入JSON。打包保留CSP與相對Pages路徑，CI提供一天的手機截圖 artifact。正式 CDN／HTTPS 已有 Stage 4B-2 與後續原版逐檔核對證據；iPhone Safari 實機及完整日曆仍待驗收。每日候選前端需要自己的固定 seed 核准，不能直接替換原站 JSON。

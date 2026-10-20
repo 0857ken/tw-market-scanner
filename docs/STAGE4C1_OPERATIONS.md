@@ -1,99 +1,127 @@
-# Stage 4C-1 每日盤後更新候選架構
+# Stage 4C-1 每日盤後更新維運
 
-> 本文保留 Stage 4C-1 原始紀錄。候選 I/O、鎖、設定與更新入口已由 [Stage 4C-1B](STAGE4C1B_REVIEW.md) 補強；舊 run/daily CLI 停用。正式 baseline/state 與自動發布仍未完成。離線演練 output 不可覆寫；重跑請指定新的 output 路徑。
+校正：2026-10-20。沿用 Draft PR #2 與既有 4C-1B／4C-2B 成果。本輪未啟 schedule、部署、main 合併或正式回復。[本輪驗收與限制](STAGE4C1_REVALIDATION_20261020.md)。
 
-正式站 https://0857ken.github.io/tw-market-scanner/ 已於 Stage 4B-2 發布固定 `4b1-rc1`，Run 38496725153。正式資料SHA：`bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9`；行情日2026-10-13。此次只新增 feature、Draft PR、非正式測試；沒有合併、排程、正式部署或付費資源。
+## 正式版與候選
 
-## 架構與信任邊界
+正式站：https://0857ken.github.io/tw-market-scanner/ 。版本 `4b1-rc1`，RC commit `82b1749a2626ce30d6196a101577b8bb09273c31`；Pages Run `38496725153`。TWSE／TPEx 行情日 2026-10-13；market SHA256 `bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9`。10/12 TWSE 名單、29 檔缺價、日曆部分驗證與 Safari 未驗收仍是原版限制。
+
+4C-1B 已有隔離更新、停止 gate、不可變打包及本機回復；4C-2B 已有持久格式與發布協調離線模型。它們沒有部署到正式站。新每日 manifest 讀取器仍需精確 seed 核准；原版 JS 綁定資料 SHA，不能直接換 JSON。
+
+## 架構與追溯
 
 ```mermaid
 flowchart TD
-  A["官方最新免費來源"] --> B["隔離更新／逐市場日期及品質門檻"]
-  B -->|異常或同日修訂| R["停止／待獨立審核"]
-  B -->|有效新交易日| C["不可變資料候選／来源SHA／Run ID"]
-  F["一次建置並核准的固定前端ZIP"] --> D["獨立同包打包／manifest／逐檔SHA"]
-  C --> D
-  D --> E["ZIP驗證／瀏覽器dry-run／CAS版本與回復演練"]
-  E --> G["Stage 4C-2另行核准後才可正式Pages"]
+  S["最後成功 pointer"] --> V["封存閉包與當下 live 驗證"]
+  V --> A["隔離讀取六個官方最新來源"]
+  A --> G["原定 target、逐市場日期與品質 gate"]
+  G -->|停止或修訂| X["保留前版與失敗證據"]
+  G -->|有效新交易日| C["採集包與 receipt"]
+  F["精確核准的固定前端 seed"] --> P["獨立打包與全檔 SHA 驗證"]
+  C --> P
+  P --> D["離線瀏覽器、版本與回復演練"]
+  D --> R["另准後才可接正式發布協調器"]
 ```
 
-现有旧update-data.yml使用pipeline.run --strict，會更新不屬於觀察版的模組並可能先推失敗狀態。已改為pipeline.daily --twse-current-csv的隔離副本，再由daily_release核對新版。主repo及正式資料不寫入。market-data查詢回404，目前不存在；更新與Pages不得假設此分支存在，也不自動创建它。Stage 4B-2固定原始ZIP部署workflow維持不動，不會被新行情觸發。
+更新與打包 workflow 均人工、contents:read；打包另需 actions:read。沒有新 Pages／id-token 寫入或 schedule。CI 用 fixture，PR／push 不抓金融 API；缺正式 baseline 時在金融請求前停止。
 
-更新workflow與package-daily.yml分開，均人工觸發、contents:read，打包只有actions:read；沒有Pages或id-token寫入權限。CI只取得fixture，沒有每次PR抓金融API。打包工作只消費本repo成功update-data與CI的同一固定code SHA/run attempt，前端種子ZIP另以精確SHA指定；不在每日打包執行Vite。
+追溯鏈：原定 target／slot／deadline → 來源 URL、授權、來源日期、response digest／parsed snapshot SHA → acquisition-state 與 processor／parser／schema inventory → source run ID＋attempt、baseline head／generation、seed ZIP／pin → 公開 market、manifest、逐檔與完整 ZIP SHA＋receipt → Release／asset IDs／index → SuccessRecord／pointer。
 
-正式4b1-rc1前端把資料SHA寫入JS，不能直接換JSON。候選版新增每日manifest讀取器；同源、版本、frontendId、每次全新資料SHA、来源版本、冻结功能及資料契約均檢查。旧固定RC方式保留。策略/研究公式没有修改。日後每日重用核准種子的index/JS/CSS位元組，不能從main重新build。**這個新前端仍待一次性Stage 4C-2核准，未部署。**
+parsed snapshot SHA 與原 response digest 分欄；`responseBodyArchived:false` 不代表有原 HTTP body。每日打包重用精確 seed、不重建 UI。新資料仍須重驗來源、授權、日期、禁用範圍及同包所有檔案；新雜湊不是資料真實性或核准證據。完整歷史重建、整包欄位限制、核准證據、artifact 綁定與 B08 中斷仍有缺口，不能用離線矩陣 PASS 取代正式驗收。
 
-manifest不是獨立數位簽章；信任邊界為HTTPS、受保護的repository與經驗證發布workflow。前端核對防止資料與manifest跨版本快取、失敗或無授權profile；後端再次核對授權政策SHA、allowlist、日期、來源與完整資源SHA。不能靠改新雜湊就冒充資料合法。
+## 來源與停止條件
 
-## 日期、資料來源與停止條件
+| 來源 | 使用方式 |
+| --- | --- |
+| TWSE 日曆／公司名單 | 既有核准 OpenAPI 最新端點 |
+| TWSE 行情 | 資料集 11549 的官方當日 CSV 優先，無歷史日期參數 |
+| TWSE 行情 OpenAPI | 僅獨立診斷；CSV 異常不自動 fallback |
+| TPEx 名單／行情／法人 | 既有核准的三個最新開放端點 |
+| 信用／TWSE T86／未核准歷史 | 不抓取、不啟用 |
 
-- TWSE優先政府資料集11549列示的**最新當日CSV**（无历史date参数）。OpenAPI同名行情為獨立診斷來源，不能用較舊OpenAPI覆蓋較新CSV；目前不会遇到CSV異常就fallback或繞過官方限制。
-- TPEx只取已核准最新公司名單、盤後行情与三大法人快照。T86、信用、300日歷史不請求。TPEx法人不是完整上市櫃法人；长連續讯号停用。
-- 用来源自己的TWSE／TPEx日期，兩市場必須一致且符合原定target_date；法人日期相同。執行時間／抓取時間不代替行情日期。
-- 16:30以前不接受同日EOD；跨午夜執行仍保留原target，最多容許1個日曆日延遲，太晚/未完成/未來target直接拒絕。正式排程啟用前，須由原定事件slot計算target，不得以retry日期重算。
-- 週末與TWSE已知休市保守no-op；如果休市日出現變更行情停止。TPEx獨立完整日曆與臨時停市尚未完整驗證；舊來源停留前日視為delay、停止發布，**不能推定臨時休市**。新年度沒有日曆年份證據則停止，待確認，不猜跨年交易日。
-- 有效價格最低95%，較最後有效版本下降超過2百分點、母體数量变化超過5%、名單老於7日曆日，停止。29檔已知缺價仍為null/原因未知，不補零或判為停牌。
-- 日期倒退、兩市場不同步、同日標準化行情变更、新來源版本、來源失敗與授權不符停止。源回應內容雜湊改變但標準化資料完全相同，沿用舊不可變snapshot並记录lastResponseSha，不冒充新行情。
-- 403/429為終止错误；HTTP helper不再重試，受控update立即停止剩餘來源，不繞過。傳輸逾時最多原helper的兩次有限嘗試，不無限輪詢。
-- 同日企業名單/其他來源修訂也會保守阻擋，須在獨立feature審閱具體来源SHA与差異、測試新的完整bundle，再由owner核准；沒有自動accept-revision開關。
+- TWSE／TPEx 各讀來源日期，兩市場及 TPEx 法人須符合原定 target；執行／抓取時間不能代替行情日。
+- 同日 EOD 下限 16:30 Asia/Taipei；跨午夜保留原 target，既有人工窗口最多一個日曆日，重跑不能改成啟動日。
+- 週末或已知 TWSE 休市且來源未變為 no-op；休市日資料變更停止。TPEx 完整日曆／臨時停市未驗證，來源停前日只能判延遲；跨年缺日曆年份證據停止。
+- 同日標準化資料不變沿用原 snapshot，HTTP digest 改變另記 lastResponseSha。任何同日修訂都須另列差異、SHA、同包測試與 owner 審核；沒有自動接受開關。
+- 每市場有效價格至少 95%，較 baseline 最多下降 2 個百分點；母體變化最多 5%、名單最多落後 7 個日曆日。缺值 null，不補 0／冒稱停牌。
+- 日期倒退、雙市場不同步、來源失敗、授權或品質異常即停止，保留最後成功完整站包。
+- 403／429 立即停止剩餘來源，不重試／fallback。既有一般 HTTP helper 對其他傳輸錯誤最多兩次；本輪純來源診斷每來源一次。
+- output 不覆寫；staging 完整後才 rename 公開。鎖、冪等與預期版本 CAS 防覆寫；本機 flock／rename 不等於跨 runner 分散式交易。
 
-## 追溯與可重現性
+原完整策略 `release_check` 不放寬；信用 pending、T86、還原價、長期均線／突破／回測／法人連續訊號維持停用或暖機。observation-only 不代表 strategyComplete。
 
-每次候選保存：原定target、實際各市場日期、来源URL／授權證據／抓取時間／HTTP回應SHA、標準化snapshot鏈、输入SHA、輸出公開market SHA、sourceIdentitySha、许可政策SHA、processorCommit、source Run ID、固定frontend pin、逐檔SHA、manifest SHA和整個ZIP SHA。archive entries固定時間，ZIP不可覆蓋。
-
-CI的`ci-fixture-<Run ID>`明確是離線已取來源資料演練，不能聲稱最新行情。正式候选必须来自独立成功更新run的candidate gate。
-
-`pipeline.daily_state`只在本機暫存store演練完整ZIP儲存、immutable ledger、鎖與CAS current pointer；預期前版不符則拒绝，重复worker不能覆蓋，寫入中断不变更最後完整pointer。舊ZIP保留，回復重新驗证完整旧包且CAS；此API不是正式網站操作。
-
-## 本次受控官方測試
-
-2026-10-14 09:55 Asia/Taipei啟動，一次低負載測試、六個最新端點。沒有歷史/T86/信用请求。六來源均取得/驗證成功；另一次TWSE OpenAPI獨立診斷也為10/13（1095列，SHA見證據JSON），未用它替換CSV：TWSE行情与TPEx行情、法人均2026-10-13；TWSE公司名單从10/12到10/13，SHA `e13ad5d1be3d68ea8ba2ae73203bbeccca3a1a8473b71694dd8d0727db7c9aa5`。有效上市1081/1085=99.63%，上櫃868/893=97.20%；总1949/1978=98.53%，缺29。
-
-**发布gate正确停止于same-day revision requires separate review。** 不是API失败、不是新交易日，也不是已发布新版；没有以执行10/14冒充来源行情10/14。完整attempt/failure证据见STAGE4C1_CURRENT_TEST.json。离线成功新日用真实10/8 baseline与10/13 fixture验证；打包、浏览器與回復均为非正式演练。
-
-## 建议将来排程及失败通报（本阶段不启用）
-
-建議台灣工作日18:30主slot；來源延遲/短暫傳輸故障最多19:30、20:30各一個備援slot，全部使用同一原定交易日和CAS去重。21:30後不做當天補發布，跨午夜只可保留原target做限定人工重跑。已完成版本no-op；403/429、修订、覆盖率/授权/日期异常不自动重试，人工处理。
-
-GitHub Actions可能延遲或丢slot；workflow timeout-minutes 8／concurrency cancel:false/单一更新组防止並發。用户可開啟GitHub原生workflow failure邮件通知，工作summary及failure.json列明來源、日期、最後有效版本。休市no-op不是failed；delay/日期不同步會失败/告警。没有授权发送LINE/邮件、沒有外部通知服務。没有新排程即无法实现主动每日过期监测；浏览器显示原行情日期與日曆日延遲，Stage 4C-2应批准独立同slot报告。
-
-公開repo標準ubuntu-24.04 runner免費；不用larger runner、paid datasource或外部雲端。GitHub Free儲存额度500MB、Pages成品1GB/每月100GB soft bandwidth，應同repo及帳號artifact使用量一起檢查；不是保證無限儲存。工作artifact7日、診斷7日，前後兩個**核准完整正式ZIP及receipt**需要持久保存在repository受控release/state，不依赖artifact到期，也不要每日重建全历史大包。本stage尚未建立正式release/state分支。官方證據：
-https://docs.github.com/en/billing/concepts/product-billing/github-actions
-https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits
-
-## 非正式重现
+## 支援入口與離線重現
 
 ```bash
+python3 -m pipeline.verified_baseline --help
+```
+
+正式 state 完成並經相應核准後，候選入口需要全部精確值；下例不是發布授權：
+
+```bash
+python3 -m pipeline.verified_baseline \
+  --expected-zip-sha256 "$APPROVED_PUBLISHED_ZIP_SHA256" \
+  --expected-generation "$APPROVED_GENERATION" \
+  --target-date "$ORIGINAL_TARGET_DATE" \
+  --slot "$ORIGINAL_SLOT" --deadline "$ORIGINAL_DEADLINE" \
+  --run-id "$SOURCE_RUN_ID" --run-attempt "$SOURCE_RUN_ATTEMPT" \
+  --output "$NEW_UNIQUE_OUTPUT" --fetch-current
+```
+
+缺 pointer／閉包／live 對應或有 active／halted 交易，停止且無金融請求。舊 run／daily CLI 及 daily_release 直接抓取不受支援；不要繞過 loader、用 fixture 冒充正式 baseline，或建立 market-data 替代。來源診斷成功不賦予候選資格。
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+npm ci --prefix frontend --no-audit --no-fund
+python3 -m scripts.audit_workflows
 npm test
 npm run build
 node scripts/audit-built.mjs
+npm exec --prefix frontend -- playwright install chromium
 npm run test:e2e
 npm run build:rc
 npm run test:rc:e2e
 node scripts/audit-rc.mjs
 node scripts/build-daily-seed.mjs
-python -m scripts.daily-dry-run
+python3 -m scripts.daily-dry-run --output test-results/NEW-UNIQUE-REHEARSAL
 cd frontend
 node node_modules/@playwright/test/cli.js test --config playwright.daily.config.js
 ```
 
-仅需要额外人工请求最新数据时，在repo根目录执行下面命令（原target须正确；不能再用pipeline.run --strict作为盘后观察正式更新器）：
+Linux 需可信 Chromium 與系統相依。若本機下載受限，保留限制，由既有 CI 執行三組瀏覽器測試，不換不可信二進位。dry-run 使用 fixture 來源日，不是最新真實候選或正式發布，證據須標 productionDeployed=false。
 
-```bash
-python -m pipeline.daily_release --output test-results/stage4c1-current --target-date YYYY-MM-DD --run-id UNIQUE-MANUAL-ID --fetch-current
-```
+歷史官方測試 [10/14 證據](STAGE4C1_CURRENT_TEST.json) 被同日名單修訂正確阻擋。本輪 [10/20 來源診斷](STAGE4C1_SOURCE_PROBE_20261020.json) 僅作來源 metadata 核對，不算新交易日完整候選。
 
-同日修訂停止即保留證據等待owner，不重复抓取以绕过。整个原data目录/正式快照不变。
+## 建議排程與回報（未啟用）
 
-## Stage 4C-2正式发布与回復的必要前置
+| 台灣時間 | 用途 | 規則 |
+| --- | --- | --- |
+| 工作日 18:30 | 主 slot | 原定事件交易日與核准日曆 |
+| 19:30、20:30 | 最多兩個備援 | 僅來源延遲或短暫傳輸故障；同 target 與去重身份 |
+| 21:30 | 當日自動發布截止 | 遲到不改 target，跨午夜只在既有規格內人工處理 |
 
-1. 明确核准本Draft PR的固定commit合併；核准新的manifest读者前端完整seed ZIP与static pin。现有4b1-rc1不能直接换JSON。
-2. 核准同日TWSE名單修订的新SHA和影响，或等待新的有效行情日与独立审核通过候选；不可忽略本次挡下结果。
-3. 核准自动数据gate阈值、18:30及备援slots、target_date规则、已知休市/临时停市安全停止和日历不足限制。审查跨年TPEx证据；不得宣称日历完整。
-4. 核准正式publish workflow（仅部署job pages:write/id-token:write）与人工初始化后自动发布权限。**此stage没有安装该自动部署job，也没有打开任何repo variable。**
-5. 建立受保护不可变state/完整ZIP存储，确定owner审核后第一版seed以及现有4b1正式ZIP为真实最后有效版本；更新job只读已成功published pointer，不可读未批准market-data。发布前CAS/重新验包、备份旧ZIP。发布后HTTPS获取每个asset/manifest/market，逐个比SHA后记successful pointer与run。
-6. 核准自动正式回復或改为故障后人工授权；默认停止并报告，不擅自回退/撤站。首次4b1发布时并不存在前一正式版本；未来第一次新版成功后才有此前真实正式版本。
-7. iPhone Safari实机验收（搜尋、自選股持久化、触控热力图、底栏safe-area与刷新错误）；本stageChromium不等于Safari。
-8. 检查免费储存/带宽总额度；授权GitHub原生通知设置或独立报告，避免额外服务。实际source迟延后先手动成功一次全链再启schedule。
+成功重觸發 no-op。403／429、官方拒絕、同日修訂、日期／品質／授權異常不自動重試。GitHub 可能延遲／漏 slot；需固定 intended slot／deadline。部署 UNKNOWN 不能在下個 slot 再送 create。
 
-正式更新未来的顺序应为：读取最后successful指针/备份原ZIP → 受控取得最新来源 → 数据gate → 原子候选 → 独立固定前端打包/全SHA验证 → CAS确认最后正式版未变 → 单次Pages → HTTPS逐檔驗證 → 记成功指针。**网站发布后的重大问题立即报告，未授权自动rollback前只能停止。** Pages平台发布和state pointer不是跨系统事务，需要幂等协调及发布中/未知状态的人工恢复验收；这个生产协调实现属于4C-2，不能把本机CAS演练当作已完成正式自动更新。
+summary／failure evidence 應列來源、原定／實際日期、最後成功版與停止原因，涵蓋失敗、資料過期、不同步、漏 slot 與未知部署。可用 GitHub 原生 failure 訂閱；本輪不寄信／LINE。主動新鮮度看門及通知尚待接線／驗收，不能把設計當作運作。網頁保留原行情日期及日曆日延遲。
+
+## 免費額度
+
+2026-10-20 核對官方文件：公開 repo 標準 hosted runner 免費，larger runner 仍計費。Free 列 500 MB artifact／Packages 共享額度，cache 另列每 repo 10 GB。Pages 發布站最大 1 GB、每月頻寬 100 GB soft limit；10 builds/hour soft limit不適用自訂 Actions 發布，仍非無限資源。
+
+容量示例而非帳單：每 slot 10 MiB、每天最多三次、保留七天約 210 MiB，仍須加帳號其他 artifacts／Packages。現有一般診斷七天、瀏覽器截圖一天。完整正式 ZIP、receipt、seed、來源閉包及成功紀錄不能只靠會到期 artifact；保留必要舊版，不自動刪歷史、GC 或付費。
+
+[Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions) · [Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)。帳號實際使用量／預算未核實，啟用前須確認。本輪不開通付費服務／新增付費依賴。
+
+## 正式發布、回復與 Stage 4C-2 關卡
+
+1. 依精確 commit／內容確認後續修補與 main 合併；本輪不合併。新前端 seed ZIP／pin、gate 政策、slot／deadline、正式發布／回復權限須精確核准，不能用 CLI 字串取代。
+2. 關閉完整歷史來源重建、整包公開欄位限制、成功核准證據鏈、Pages artifact／核准 bytes 綁定、B08 實際中斷驗收缺口。
+3. 完成既有 4C-2C 範圍：有效 state 保護、orphan／受保護 append 可用管道與專用 authority；原四資產讀回、真 IDs index、immutable Release、同 commit g0；只靠遠端 pointer／Release 乾淨還原。不加 PAT／Secrets、不弱化規則。
+4. main 舊更新與首次 Pages 入口退役或接入單一預約／fence，正式 daily writer 才能開放。
+5. 真實新交易日從成功 baseline 全鏈到候選；另准一次人工正式發布後，取得精確 Pages ID／succeed 及兩輪所有公開檔 SHA，最後 CAS 才記成功 pointer。
+6. 失敗時舊成功 pointer 不動。timeout／取消／runner 消失／response 遺失不證明站點沒變；保留 active／halt、唯讀 reconcile。站點已換而 pointer 未記時先提出唯一證據的補記計畫，不自動重部署。
+7. 正式人工回復需精確授權，驗原完整舊 ZIP、其 seed／receipt／來源／政策，經同協調器產生新 generation／rollbackOf，再驗 live；不重新 build、不只換 pointer、不擅自自動 rollback。
+8. 驗 TPEx／臨時停市／跨年、iPhone Safari 搜尋／自選持久化／觸控熱力圖／safe-area／刷新錯誤；Chromium 不代替 Safari。
+9. 核對免費用量／預算、過期與漏 slot 回報、真實失敗／UNKNOWN／回復驗收；全部完成並另准每日更新後才可啟 schedule。
+
+原 artifact 11862513391 到期 2026-10-21 09:17:40（台北）；已有原包保全與可攜備份紀錄，但遠端 immutable Release 尚不存在。到期不讓既有站點自動下線。4C-2C 已有部分設定，不應重新建規則，也不能誤寫成全部尚未授權／全部完成。
