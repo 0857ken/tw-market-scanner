@@ -2,9 +2,67 @@ import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 const market=JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/official-market-20261007.json',import.meta.url),'utf8'));
 const pages=['資料健康','我的關注','信用利差','市場廣度','市場體制','台股熱力圖','美股熱力圖','高點突破','產業輪動','盤中量能','法人買賣超','連續買賣超','期貨籌碼','融資水位','券商分點','盤前觀察','研究週報','持股水位'];
+for(const width of [320,375,390,430])test(`mobile polish ${width}px: touch, search, drawer and focus`,async({browser})=>{
+  const context=await browser.newContext({viewport:{width,height:844},isMobile:true,hasTouch:true});
+  const page=await context.newPage();
+  try{
+    await loaded(page);
+    const search=page.locator('#stock-search');
+    expect(await search.evaluate(e=>parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(16);
+    await search.fill('2330');
+    for(const name of ['清除搜尋','收起搜尋鍵盤']){
+      const box=await page.getByRole('button',{name,exact:true}).boundingBox();
+      expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.getByRole('button',{name:'收起搜尋鍵盤',exact:true}).tap();
+    await expect(search).not.toBeFocused();await expect(search).toHaveValue('2330');
+    await expect(page.locator('.search-results button').first()).toBeVisible();
+    await page.locator('.search-results button').first().tap();
+    const drawer=page.getByRole('dialog');await expect(drawer).toContainText('2330');
+    await expect(page.locator('.main-col')).toHaveAttribute('inert','');
+    expect(await page.evaluate(()=>document.body.style.position)).toBe('fixed');
+    const close=drawer.getByRole('button',{name:'關閉',exact:true});await expect(close).toBeFocused();
+    const box=await close.boundingBox();expect(box.width).toBeGreaterThanOrEqual(44);expect(box.height).toBeGreaterThanOrEqual(44);
+    await page.keyboard.press('Shift+Tab');expect(await drawer.evaluate(e=>e.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press('Tab');await expect(close).toBeFocused();
+    await drawer.evaluate(e=>{e.scrollTop=e.scrollHeight});await expect(close).toBeInViewport();
+    await close.tap();await expect(drawer).toHaveCount(0);await expect(search).toBeFocused();
+    expect(await page.evaluate(()=>document.body.style.position)).toBe('');
+    await search.fill('2330');await search.press('Enter');await expect(drawer).toContainText('2330');
+    await page.keyboard.press('Escape');await expect(drawer).toHaveCount(0);
+    await search.fill('沒有這個代碼'.repeat(10));await expect(page.locator('.search-results')).toContainText('找不到此股票');
+    const bounds=await page.locator('.quick-search').boundingBox();expect(bounds.x+bounds.width).toBeLessThanOrEqual(width+1);
+    await page.getByRole('button',{name:'清除搜尋',exact:true}).tap();await expect(search).toHaveValue('');await expect(search).toBeFocused();
+    await page.locator('.page-top h1').tap();await expect(page.locator('.search-results')).toHaveCount(0);
+  }finally{await context.close()}
+});
+test('mobile polish: visual viewport keyboard response and search key navigation',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await loaded(page);
+  const search=page.locator('#stock-search');await search.fill('23');
+  // Controlled viewport resize checks application behavior, not a real OS keyboard.
+  await page.evaluate(()=>{Object.defineProperty(visualViewport,'height',{configurable:true,get:()=>500});visualViewport.dispatchEvent(new Event('resize'))});
+  await expect(page.locator('.bottom-nav')).toBeHidden();
+  expect(await page.locator('.search-results').evaluate(e=>e.getBoundingClientRect().bottom)).toBeLessThanOrEqual(500);
+  await page.getByRole('button',{name:'收起搜尋鍵盤',exact:true}).click();await expect(page.locator('.bottom-nav')).toBeVisible();
+  await search.focus();await search.press('ArrowDown');await expect(page.locator('.search-results button').first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');await expect(page.locator('.search-results button').nth(1)).toBeFocused();
+  await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');await expect(search).toBeFocused();
+  await page.evaluate(()=>{delete visualViewport.height;visualViewport.dispatchEvent(new Event('resize'))});
+});
+test('mobile polish: backdrop drag does not dismiss and closing restores page scroll',async({page})=>{
+  await page.setViewportSize({width:1440,height:844});await loaded(page);
+  await page.locator('#stock-search').fill('2330');await page.locator('#stock-search').press('Enter');
+  const drawer=page.getByRole('dialog');await expect(drawer).toBeVisible();
+  const box=await drawer.boundingBox();await page.mouse.move(box.x+30,box.y+160);await page.mouse.down();await page.mouse.move(10,160);await page.mouse.up();await expect(drawer).toBeVisible();
+  await page.locator('.modal-backdrop').click({position:{x:10,y:160}});await expect(drawer).toHaveCount(0);
+  await page.evaluate(()=>scrollTo(0,400));const scroll=await page.evaluate(()=>scrollY);
+  await page.getByRole('button',{name:'接入資料',exact:true}).evaluate(e=>e.click());await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(scroll);
+});
 async function loaded(page){
   await page.route('**/market.json*',route=>route.fulfill({json:market}));
-  await page.goto('./');await expect(page.locator('.data-banner')).toContainText(market.asOf);
+  await page.goto('./');await expect(page.locator('.data-banner')).toContainText(market.asOf,{timeout:15000});
 }
 async function go(page,name){
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
