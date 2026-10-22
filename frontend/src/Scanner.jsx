@@ -370,10 +370,11 @@ function WatchView({ signals, watchlist, onStock }) { return <Panel title="我�
   </Panel>;
 }
 function StockDrawer({ stock, close, watching, toggle }) {
+  const backdropStart=useRef(false);
   if(!stock)return null;
   const calculated=stockMetrics(stock);
   const s=OBSERVATION_ONLY?{...calculated,close:stock.close,date:stock.date,change:stock.change}:calculated;
-  return <div className="modal-backdrop" onClick={close}><aside className="stock-drawer" role="dialog" aria-modal="true" aria-label={`${s.name} 個股明細`} onClick={e=>e.stopPropagation()}>
+  return <div className="modal-backdrop" onPointerDown={e=>{backdropStart.current=e.target===e.currentTarget}} onClick={e=>{if(backdropStart.current&&e.target===e.currentTarget)close()}}><aside className="stock-drawer" role="dialog" aria-modal="true" aria-label={`${s.name} 個股明細`} tabIndex={-1} onClick={e=>e.stopPropagation()}>
     <div className="drawer-head"><div><span className="eyebrow">STOCK RESEARCH</span><h2>{s.symbol} {s.name}</h2><small className="muted">{s.sector}　·　資料日 {s.date || '—'}</small></div><button className="icon-btn" onClick={close} aria-label="關閉"><X size={20}/></button></div>
     <div className="stock-price"><b>{format(s.close,2)}</b><Percent value={s.change}/><button className={`fav-btn ${watching?'active':''}`} onClick={()=>toggle(securityKey(s))}><Star size={17} fill={watching?'currentColor':'none'}/>{watching?'已關注':'加入關注'}</button></div>
     <div className="drawer-stats">{[['MA20',s.ma20],['MA60',s.ma60],['MA120',s.ma120],['MA240',s.ma240],['量比',s.volRatio]].map(([k,v])=><div key={k}><span>{k}</span><b>{OBSERVATION_ONLY?'停用':format(v,2)}{!OBSERVATION_ONLY&&k==='量比'&&numeric(v)?'x':''}</b></div>)}</div>
@@ -426,6 +427,9 @@ export default function Scanner(){
   const [error,setError]=useState(''),[search,setSearch]=useState(''),[selected,setSelected]=useState(null),[creditRange,setCreditRange]=useState('120D');
   const [scope,setScope]=useState('ALL'),[basis,setBasis]=useState('adjusted');
   const [reload,setReload]=useState(0),[loading,setLoading]=useState(true),[clock,setClock]=useState(Date.now());
+  const [searchOpen,setSearchOpen]=useState(false),[keyboardOpen,setKeyboardOpen]=useState(false);
+  const appRef=useRef(null),searchRef=useRef(null),searchBoxRef=useRef(null),openerRef=useRef(null),restoreScrollRef=useRef(null);
+  const hasOverlay=Boolean(selected||sourceOpen||menu);
   const [watchlist,setWatchlist] = useState(()=>{ try{return JSON.parse(localStorage.getItem('tw-scanner-favorites-v1') || '[]').filter(s=>typeof s==='string').map(s=>s.includes(':')?s:`TWSE:${s}`);}catch{return [];} });
   useEffect(()=>{try{localStorage.setItem('tw-scanner-favorites-v1',JSON.stringify(watchlist))}catch{}},[watchlist]);
   useEffect(() => {
@@ -440,20 +444,63 @@ export default function Scanner(){
   }, [reload]);
   useEffect(()=>{const timer=setInterval(()=>setClock(Date.now()),60000);return()=>clearInterval(timer)},[]);
   useEffect(()=>{
+    const viewport=window.visualViewport;
+    const measure=()=>{
+      const height=viewport?.height||window.innerHeight,top=viewport?.offsetTop||0;
+      const keyboard=document.activeElement===searchRef.current&&document.documentElement.clientHeight-height>120;
+      setKeyboardOpen(keyboard);
+      appRef.current?.style.setProperty('--visual-height',`${height}px`);
+      appRef.current?.style.setProperty('--visual-top',`${top}px`);
+      const bottom=searchBoxRef.current?.getBoundingClientRect().bottom||0;
+      appRef.current?.style.setProperty('--search-max-height',`${Math.max(44,Math.min(340,top+height-bottom-(keyboard?12:84)))}px`);
+    };
+    const outside=e=>{if(!searchBoxRef.current?.contains(e.target)){setSearchOpen(false);if(document.activeElement===searchRef.current)searchRef.current.blur()}};
+    measure();
+    viewport?.addEventListener('resize',measure);viewport?.addEventListener('scroll',measure);
+    window.addEventListener('resize',measure);window.addEventListener('scroll',measure,{passive:true});
+    document.addEventListener('focusin',measure);document.addEventListener('focusout',measure);document.addEventListener('pointerdown',outside);
+    return()=>{viewport?.removeEventListener('resize',measure);viewport?.removeEventListener('scroll',measure);window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure);document.removeEventListener('focusin',measure);document.removeEventListener('focusout',measure);document.removeEventListener('pointerdown',outside)};
+  },[]);
+  useEffect(()=>{
     if(!selected&&!sourceOpen&&!menu)return;
-    const previous=document.activeElement;
-    const close=e=>{if(e.key==='Escape'){setSelected(null);setSourceOpen(false);setMenu(false)}};
-    const prior=document.body.style.overflow;
-    document.body.style.overflow='hidden';document.addEventListener('keydown',close);
-    const timer=setTimeout(()=>document.querySelector('[role="dialog"] button,.sidebar-open button')?.focus(),0);
-    return()=>{clearTimeout(timer);document.body.style.overflow=prior;document.removeEventListener('keydown',close);previous?.focus?.()};
+    const previous=openerRef.current||document.activeElement;openerRef.current=null;
+    const body=document.body,scrollX=window.scrollX,scrollY=window.scrollY;
+    const properties=['overflow','position','top','left','width','paddingRight'];
+    const prior=Object.fromEntries(properties.map(k=>[k,body.style[k]]));
+    const scrollbar=window.innerWidth-document.documentElement.clientWidth;
+    if(scrollbar>0)body.style.paddingRight=`${parseFloat(getComputedStyle(body).paddingRight)+scrollbar}px`;
+    Object.assign(body.style,{overflow:'hidden',position:'fixed',top:`-${scrollY}px`,left:`-${scrollX}px`,width:'100%'});
+    const root=()=>document.querySelector('[role="dialog"],.sidebar-open');
+    const focusables=()=>[...(root()?.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')||[])].filter(e=>e.getClientRects().length);
+    const focusFirst=()=>focusables()[0]?.focus({preventScroll:true});
+    const keydown=e=>{
+      if(e.key==='Escape'){e.preventDefault();setSelected(null);setSourceOpen(false);setMenu(false)}
+      if(e.key==='Tab'){
+        const items=focusables(),first=items[0],last=items.at(-1);
+        if(!items.length){e.preventDefault();root()?.focus();return;}
+        if(e.shiftKey&&(document.activeElement===first||!root()?.contains(document.activeElement))){e.preventDefault();last.focus()}
+        else if(!e.shiftKey&&(document.activeElement===last||!root()?.contains(document.activeElement))){e.preventDefault();first.focus()}
+      }
+    };
+    const keepFocus=e=>{if(!root()?.contains(e.target))focusFirst()};
+    document.addEventListener('keydown',keydown);document.addEventListener('focusin',keepFocus);
+    const timer=setTimeout(focusFirst,0);
+    return()=>{clearTimeout(timer);document.removeEventListener('keydown',keydown);document.removeEventListener('focusin',keepFocus);Object.assign(body.style,prior);window.scrollTo(scrollX,restoreScrollRef.current??scrollY);restoreScrollRef.current=null;if(previous?.isConnected&&previous.getClientRects().length)previous.focus?.({preventScroll:true});else searchRef.current?.focus({preventScroll:true})};
   },[selected,sourceOpen,menu]);
   const signals=useMemo(()=>{const result=getSignals(market,scope,basis);return OBSERVATION_ONLY?observationSignals(result):result},[market,scope,basis]);
   const viewMarket={...market, asOf:signals.anchor, stocks:market.stocks.filter(s=>(scope==='ALL'||(s.market||'TWSE')===scope)&&memberOn(s,signals.anchor)),
     universe:`${MARKET_NAMES[scope]} · ${BASIS_NAMES[basis]} · 當期普通股名單，非歷史成員回測`,
     sources:scope==='TPEx'?{...market.sources,institutional:market.sources.tpexInstitutional||{status:'unavailable',reason:'TPEx 法人資料尚未載入'}}:market.sources,
     institutionalSessions:scope==='TPEx'?(market.research?.markets?.TPEx?.institutionalSessions||[]):market.institutionalSessions};
-  const newPage=v=>{setPage(OBSERVATION_ONLY&&!OBS_PAGES.has(v)?'停用功能':v);setMenu(false);window.scrollTo({top:0,behavior:'smooth'});};
+  const newPage=v=>{if(menu)restoreScrollRef.current=0;setPage(OBSERVATION_ONLY&&!OBS_PAGES.has(v)?'停用功能':v);setMenu(false);setSearchOpen(false);searchRef.current?.blur();window.scrollTo({top:0,behavior:'smooth'});};
+  function openStock(stock,returnTarget=document.activeElement){openerRef.current=returnTarget;searchRef.current?.blur();setKeyboardOpen(false);setSearchOpen(false);setSelected(stock);}
+  function chooseSearch(stock){openStock(stock,searchRef.current);setSearch('');}
+  function searchKeys(e){
+    if(e.nativeEvent.isComposing)return;
+    if(e.key==='Escape'){e.preventDefault();setSearchOpen(false);e.currentTarget.blur()}
+    if(e.key==='ArrowDown'&&search){e.preventDefault();setSearchOpen(true);requestAnimationFrame(()=>document.querySelector('#stock-search-results button')?.focus())}
+    if(e.key==='Enter'&&search&&currentStocks.length){e.preventDefault();chooseSearch(currentStocks[0])}
+  }
   const toggleWatch=symbol=>setWatchlist(prev=>prev.includes(symbol)?prev.filter(s=>s!==symbol):[...prev,symbol]);
   const currentStocks=signals.latest.filter(s=>`${s.symbol} ${s.name}`.toLowerCase().includes(search.toLowerCase())).slice(0,8);
   const selectedExchanges=scope==='ALL'?['TWSE','TPEx']:[scope];
@@ -467,21 +514,21 @@ export default function Scanner(){
         <p>信用利差：規則與原始輸入待確認；TWSE T86：再散布授權待確認。兩者保持凍結。</p>
         <p>TPEx 法人只涵蓋上櫃，不代表完整上市櫃法人資訊。</p>
       </Panel>;
-      case '總覽':return <Overview market={viewMarket} signals={signals} go={newPage} onStock={setSelected} watchlist={watchlist}/>;
+      case '總覽':return <Overview market={viewMarket} signals={signals} go={newPage} onStock={openStock} watchlist={watchlist}/>;
       case '資料健康':return <HealthView market={market}/>;
-      case '我的關注':return <WatchView signals={signals} watchlist={watchlist} onStock={setSelected}/>;
+      case '我的關注':return <WatchView signals={signals} watchlist={watchlist} onStock={openStock}/>;
       case '信用利差':return <CreditView market={viewMarket} signals={signals} range={creditRange} setRange={setCreditRange}/>;
       case '市場廣度':return <BreadthView signals={signals} universe={viewMarket.universe}/>;
       case '市場體制':return <RegimeView market={viewMarket} signals={signals}/>;
-      case '台股熱力圖':return <Heatmap market={viewMarket} signals={signals} onStock={setSelected}/>;
+      case '台股熱力圖':return <Heatmap market={viewMarket} signals={signals} onStock={openStock}/>;
       case '美股熱力圖':return <Heatmap market={viewMarket} signals={signals} us/>;
-      case '高點突破':return <BreakoutView signals={signals} onStock={setSelected}/>;
-      case '法人買賣超':return <InstitutionView market={viewMarket} signals={signals} onStock={setSelected}/>;
-      case '連續買賣超':return <StreakView market={viewMarket} signals={signals} onStock={setSelected}/>;
+      case '高點突破':return <BreakoutView signals={signals} onStock={openStock}/>;
+      case '法人買賣超':return <InstitutionView market={viewMarket} signals={signals} onStock={openStock}/>;
+      case '連續買賣超':return <StreakView market={viewMarket} signals={signals} onStock={openStock}/>;
       case '期貨籌碼':return <FuturesView market={market}/>;
-      case '融資水位':return <MarginView signals={signals} onStock={setSelected}/>;
+      case '融資水位':return <MarginView signals={signals} onStock={openStock}/>;
       case '盤中量能':return <VolumeView signals={signals}/>;
-      case '產業輪動':return <SectorView signals={signals} onStock={setSelected}/>;
+      case '產業輪動':return <SectorView signals={signals} onStock={openStock}/>;
       case '研究週報':return <WeeklyView market={viewMarket} signals={signals}/>;
       case '持股水位':return <PollView/>;
       case '盤前觀察':return market.overnight?.length?<Panel title="隔夜市場" subtitle="需輸入實際昨夜市場資料"><DataGrid rows={market.overnight} columns={[{key:'name',name:'指數',left:true},{key:'change',name:'漲跌',render:r=><Percent value={r.change}/>}]} /></Panel>:<NoDataModule title="盤前觀察" detail="需要具日期時間與交易日對齊的台指期夜盤、美股指數、費半、台積電 ADR 資料；原版固定負報酬已移除。"/>;
@@ -489,16 +536,16 @@ export default function Scanner(){
       default:return null;
     }
   };
-  return <div className="app">
+  return <div className="app" ref={appRef}>
     {menu&&<button type="button" aria-label="關閉側邊選單" className="mobile-scrim" onClick={()=>setMenu(false)}/>}
-    <aside className={`sidebar ${menu?'sidebar-open':''}`}>
+    <aside className={`sidebar ${menu?'sidebar-open':''}`} inert={selected||sourceOpen?'':undefined}>
       <div className="brand"><div className="brand-icon"><Activity size={23}/></div><div><b>市場雷達</b><small>TAIWAN MARKET SCANNER</small></div></div>
       <button className={`nav-home ${page==='總覽'?'active':''}`} onClick={()=>newPage('總覽')}><LayoutDashboard size={17}/> 市場總覽 <ChevronRight size={16}/></button>
       <div className="nav-scroll">{(OBSERVATION_ONLY?OBS_NAV:NAV).map(group=><div className="nav-group" key={group.label}><span className="nav-heading">{group.label}</span>{group.items.filter(row=>row[0]!=='總覽').map(([name,Icon])=><button className={`nav-item ${page===name?'active':''}`} key={name} onClick={()=>newPage(name)}><Icon size={17}/><span>{name}</span>{name==='信用利差'&&signals.creditNow?.light==='RED'&&<i className="nav-alert"/>}</button>)}</div>)}</div>
       <div className="sidebar-bottom"><div className="source-indicator"><span className={`live-dot ${quoteStatus!=='fresh'?'is-demo':''}`}/>{market.mode==='demo'?'DEMO / 虛構市場':`${STATUS_NAMES[quoteStatus]} / 盤後資料`}</div><button onClick={()=>OBSERVATION_ONLY?newPage('資料健康'):setSourceOpen(true)}><Database size={16}/> 資料來源設定 <ChevronRight size={15}/></button></div>
     </aside>
-    <div className="main-col">
-      <header className="topbar"><button className="hamburger" onClick={()=>setMenu(!menu)} aria-label="開啟選單"><Menu size={21}/></button>
+    <div className="main-col" inert={hasOverlay?'':undefined}>
+      <header className="topbar"><button className="hamburger" aria-expanded={menu} onClick={()=>setMenu(!menu)} aria-label="開啟選單"><Menu size={21}/></button>
         <div className="breadcrumb"><span>台股掃描器</span><ChevronRight size={13}/><strong>{page}</strong></div>
         <div className="top-actions"><button className="search-toggle" onClick={()=>{const e=document.querySelector('#stock-search');e?.focus();}} aria-label="搜尋股票"><Search size={18}/></button>
           <button className="icon-btn refresh-btn" aria-label="重新讀取盤後快照" disabled={loading} onClick={()=>setReload(v=>v+1)}><RotateCcw size={17}/></button>
@@ -506,8 +553,8 @@ export default function Scanner(){
       </header>
       <main className="content">
         <div className="page-top"><div><div className="eyebrow">盤後觀察版 / {signals.anchor||market.asOf||"待資料"}</div><h1>{page==='總覽'?'市場總覽':page}</h1><p>{page==='總覽'?'用更少的畫面，掌握真正重要的市場變化。':'資料缺口會明確標示，不用猜測任何數字。'}</p></div>
-          <div className="quick-search"><Search size={16}/><input id="stock-search" placeholder="搜尋股票，例如 2330、台積電" value={search} onChange={e=>setSearch(e.target.value)}/>{search&&<button aria-label="清除搜尋" onClick={()=>setSearch('')}><X size={15}/></button>}
-            {search&&<div className="search-results">{currentStocks.length?currentStocks.map(s=><button key={securityKey(s)} onClick={()=>{setSelected(s);setSearch('')}}><b>{s.symbol}</b><span>{s.name}</span><Percent value={s.change}/></button>):<p>找不到此股票</p>}</div>}
+          <div className="quick-search" ref={searchBoxRef}><Search size={16}/><input ref={searchRef} id="stock-search" type="search" role="combobox" aria-label="搜尋股票" aria-autocomplete="list" aria-controls="stock-search-results" aria-expanded={Boolean(search&&searchOpen)} enterKeyHint="search" autoComplete="off" spellCheck={false} placeholder="搜尋股票，例如 2330、台積電" value={search} onFocus={()=>setSearchOpen(true)} onKeyDown={searchKeys} onChange={e=>{setSearch(e.target.value);setSearchOpen(true)}}/>{search&&<button type="button" aria-label="清除搜尋" onMouseDown={e=>e.preventDefault()} onClick={()=>{setSearch('');searchRef.current?.focus()}}><X size={17}/></button>}
+            {search&&searchOpen&&<><button type="button" aria-label="收起搜尋鍵盤" title="收起鍵盤，保留搜尋結果" onClick={()=>{searchRef.current?.blur();setKeyboardOpen(false)}}><ChevronDown size={18}/></button><div id="stock-search-results" className="search-results" role="listbox" aria-label="股票搜尋結果" onKeyDown={e=>{const items=[...e.currentTarget.querySelectorAll('button')],index=items.indexOf(document.activeElement);if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();items[(index+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus()}if(e.key==='Escape'){e.preventDefault();setSearchOpen(false);searchRef.current?.blur()}}}>{currentStocks.length?currentStocks.map(s=><button type="button" role="option" aria-selected={false} key={securityKey(s)} onClick={()=>chooseSearch(s)}><b>{s.symbol}</b><span>{s.name}</span><Percent value={s.change}/></button>):<p role="status">找不到此股票</p>}</div></>}
           </div>
         </div>
         <div className={`data-banner ${quoteStatus!=='fresh'?'demo-banner':''}`} role="status"><Database size={17}/><span>{loading?'讀取官方盤後快照…':market.mode==='demo'?'虛構 DEMO · 固定測試行情，所有數字都不是市場事實。':market.mode==='unavailable'?'官方行情尚未載入；空白不代表價格或風險為零。':`官方盤後資料日 ${sourceDate} · ${STATUS_NAMES[quoteStatus]} · 非即時報價。`}</span><button onClick={()=>newPage('資料健康')}>資料健康 <ChevronRight size={14}/></button></div>
@@ -538,7 +585,7 @@ export default function Scanner(){
         <footer>台股掃描器 3.0　／　資料日期 {market.asOf||'—'}　／　{market.mode==='demo'?'虛構示範':OBSERVATION_ONLY?'臺灣證券交易所／證券櫃檯買賣中心；普通股篩選與研究統計，非官方網站、非投資建議或交易指令':'臺灣證券交易所／證券櫃檯買賣中心／臺灣期貨交易所；開放資料第1版，普通股篩選及研究統計，非交易指令'}　／　<a href="https://data.gov.tw/license" target="_blank" rel="noreferrer">政府資料開放授權條款第 1 版</a></footer>
       </main>
     </div>
-    <nav className="bottom-nav">{(OBSERVATION_ONLY?[['總覽',LayoutDashboard],['台股熱力圖',Layers],['產業輪動',Building2],['停用功能',ShieldAlert],['我的關注',Star]]:[['總覽',LayoutDashboard],['信用利差',ShieldAlert],['市場廣度',Waves],['高點突破',Zap],['我的關注',Star]]).map(([v,Icon])=><button key={v} className={page===v?'active':''} onClick={()=>newPage(v)}><Icon size={20}/><span>{v}</span></button>)}</nav>
+    <nav className={`bottom-nav ${keyboardOpen?'keyboard-open':''}`} aria-label="主要頁面" inert={hasOverlay?'':undefined}>{(OBSERVATION_ONLY?[['總覽',LayoutDashboard],['台股熱力圖',Layers],['產業輪動',Building2],['停用功能',ShieldAlert],['我的關注',Star]]:[['總覽',LayoutDashboard],['信用利差',ShieldAlert],['市場廣度',Waves],['高點突破',Zap],['我的關注',Star]]).map(([v,Icon])=><button key={v} aria-current={page===v?'page':undefined} className={page===v?'active':''} onClick={()=>newPage(v)}><Icon size={20}/><span>{v}</span></button>)}</nav>
     <StockDrawer stock={selected} close={()=>setSelected(null)} watching={selected?(watchlist.includes(securityKey(selected))||watchlist.includes(selected.symbol)&&selected.market!=='TPEx'):false} toggle={toggleWatch}/>
     {!OBSERVATION_ONLY&&sourceOpen&&<DataModal onClose={()=>setSourceOpen(false)} error={error} clearError={setError} onDemo={()=>{setMarket(makeDemo());setSourceOpen(false);setError('');setPage('總覽')}} onImport={next=>{setMarket(next);setSourceOpen(false);setError('');setPage('總覽')}}/>}
   </div>;

@@ -9,7 +9,7 @@ async function go(page,name){
   await expect(page.locator('.page-top h1')).toHaveText(name);
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
 }
-for(const width of [320,390,1440])test(`${width}px: pinned observation RC assets, features and scope`,async({page})=>{
+for(const width of [320,375,390,430,1440])test(`${width}px: pinned observation RC assets, features and scope`,async({page})=>{
   await page.setViewportSize({width,height:844});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const failures=[];page.on('response',r=>{if(r.status()>=400)failures.push(r.url())});
