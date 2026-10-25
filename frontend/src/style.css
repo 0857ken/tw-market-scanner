@@ -69,5 +69,5 @@ summary:focus-visible,.heatmap g[role=button]:focus-visible{outline:2px solid #9
 }
 @media(max-width:750px){
  .coverage-panel .filters>span{font-size:12px}
- .daily-summary{gap:6px;margin:8px 0}.daily-summary>div{padding:8px}.daily-summary b{margin-top:2px}
+ .daily-summary{gap:6px;margin:6px 0}.daily-summary>div{padding:6px}.daily-summary b{margin-top:2px}
 }
