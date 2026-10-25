@@ -68,3 +68,6 @@ test('real missing same-day price stays unknown in search and stock drawer',asyn
   await expect(page.getByRole('dialog').locator('.stock-price b').first()).toHaveText('—');
   await expect(page.getByRole('dialog').locator('.drawer-stats').first()).toContainText('停用');
 });
+
+import {heatmapOverviewCases} from './heatmap-overview-cases.js';
+heatmapOverviewCases(actualMarket,{rc:true});

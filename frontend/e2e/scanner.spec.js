@@ -213,7 +213,7 @@ test('Stage3D real static artifact, mobile modules, source details and performan
   await page.locator('main .panel').first().evaluate(e=>{e.scrollIntoView({block:'start'});window.scrollBy(0,-70)});
   const tiles=page.locator('.heatmap [data-security-id]');
   const expectedTiles=integrated.stocks.filter(s=>s.market==='TPEx').filter(s=>{const r=s.history.find(r=>r.date===integrated.sources.tpexQuotes.asOf);return r&&r.close>0&&typeof r.changeAmount==='number'&&r.close-r.changeAmount>0;}).length;
-  await expect(tiles).toHaveCount(expectedTiles);
+  await expect(tiles).toHaveCount(Math.min(100,expectedTiles));
   const tileId=await tiles.first().getAttribute('data-security-id');await tiles.first().click();
   await expect(page.getByRole('dialog')).toContainText(tileId.split(':')[1]);await page.keyboard.press('Escape');
   await page.screenshot({path:'../test-results/stage3d-heatmap.png',fullPage:false});
@@ -237,3 +237,6 @@ test('Stage3D mobile mismatched dates suppress combined breadth and refresh reta
   await page.route('**/market.json*',r=>r.fulfill({status:503,body:'controlled failure'}));await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
   await expect(page.locator('.global-error')).toContainText('HTTP 503');await expect(page.locator('.daily-breadth')).toContainText('2026-10-08');
 });
+
+import {heatmapOverviewCases} from './heatmap-overview-cases.js';
+heatmapOverviewCases(integrated);
