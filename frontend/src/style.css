@@ -48,3 +48,26 @@ html{overflow-x:clip}body{min-width:320px}a{color:#a2c4ff}button:focus-visible,i
   .coverage-panel select,.filters input,.filters select{font-size:16px;min-height:44px;max-width:100%;min-width:0}
   .data-banner button,.coverage-details summary{min-height:44px}
 }
+
+/* P1: daily facts first; retain the Safari interaction and safe-area rules. */
+.daily-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.daily-summary>div{min-width:0;background:#17263b;border-radius:8px;padding:10px}
+.daily-summary span,.daily-summary small{display:block;color:#a8b7d0;font-size:11px}
+.daily-summary b{display:block;font-size:23px;margin-top:5px}
+.rc-version p{font-size:12px;line-height:1.6;margin-bottom:6px}
+.version-details summary{cursor:pointer;min-height:44px;display:list-item;align-content:center;color:#9edbef;font-size:12px}
+summary:focus-visible,.heatmap g[role=button]:focus-visible{outline:2px solid #91b7ff;outline-offset:2px}
+.heatmap-summary{font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.heatmap-summary p{margin:6px 0;color:#b4c4da}
+.heatmap-legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;font-size:12px}
+.heatmap-panel .filters{flex-wrap:wrap}.heatmap-panel label{max-width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.heatmap g[role=button]{cursor:pointer}.heatmap text{pointer-events:none}
+@media(max-width:750px){
+ .daily-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.daily-summary b{font-size:21px}
+ .rc-version{padding:10px 14px}.coverage-panel{padding:10px 12px}
+ .heatmap-panel .filters select{max-width:100%;min-width:0}
+}
+@media(max-width:750px){
+ .coverage-panel .filters>span{font-size:12px}
+ .daily-summary{gap:6px;margin:6px 0}.daily-summary>div{padding:6px}.daily-summary b{margin-top:2px}
+}
