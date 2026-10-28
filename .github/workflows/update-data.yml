@@ -1,57 +1,66 @@
-name: Official EOD data
+# Stage 4C-2B: only a verified successful pointer can seed manual acquisition.
+name: Daily observation data - isolated dry-run
 on:
-  # Scheduling requires a separate owner-approved change.
   workflow_dispatch:
+    inputs:
+      target_date:
+        description: Original intended completed TWSE/TPEx session (YYYY-MM-DD)
+        required: true
+        type: string
+      expected_zip_sha256:
+        description: Exact successful published ZIP SHA256 (no latest or fixture fallback)
+        required: true
+        type: string
+      expected_generation:
+        description: Exact successful generation
+        required: true
+        type: number
+      intended_slot:
+        description: Original manual slot identifier, retained across delayed runs
+        required: true
+        type: string
+      deadline:
+        description: Original slot deadline with timezone, ISO8601
+        required: true
+        type: string
 permissions:
-  contents: write
+  contents: read
 concurrency:
-  group: independent-scanner-data
+  group: scanner-daily-candidate
   cancel-in-progress: false
 jobs:
   update:
-    # Default OFF. Standard public runners only; never write to another repository or main.
-    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false && github.ref == 'refs/heads/main' && vars.DATA_UPDATES_APPROVED == 'true'
+    if: github.repository == '0857ken/tw-market-scanner' && github.event.repository.private == false
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: main
-          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Synchronize latest data branch before reading history
+      - name: Acquire licensed current snapshots in isolation
+        env:
+          TARGET_DATE: ${{ inputs.target_date }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          EXPECTED_ZIP: ${{ inputs.expected_zip_sha256 }}
+          EXPECTED_GENERATION: ${{ inputs.expected_generation }}
+          INTENDED_SLOT: ${{ inputs.intended_slot }}
+          SLOT_DEADLINE: ${{ inputs.deadline }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m pipeline.verified_baseline --output test-results/stage4c1-current --target-date "$TARGET_DATE" --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" --expected-zip-sha256 "$EXPECTED_ZIP" --expected-generation "$EXPECTED_GENERATION" --slot "$INTENDED_SLOT" --deadline "$SLOT_DEADLINE" --fetch-current
+      - name: Save candidate or failure evidence; never publish
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: daily-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/stage4c1-current/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Actionable failure summary
+        if: failure()
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git fetch origin main
-          if git ls-remote --exit-code --heads origin market-data >/dev/null 2>&1; then
-            git fetch origin market-data
-            git switch -C market-data origin/market-data
-            git merge --no-edit origin/main
-          else
-            git switch -c market-data origin/main
-          fi
-      - name: Fetch and validate official observations
-        id: fetch
-        run: |
-          set +e
-          python -m pipeline.run --strict
-          result=$?
-          set -e
-          echo "result=$result" >> "$GITHUB_OUTPUT"
-          cat data/quality.json >> "$GITHUB_STEP_SUMMARY"
-          # Persist the explicit quality state even on failure; a separate step fails the job.
-      - name: Commit only source observations and quality state
-        run: |
-          git add data
-          if ! git diff --cached --quiet; then
-            git commit -m "data: official EOD observations and quality state"
-            git push origin HEAD:market-data
-          fi
-      - name: Fail visibly when critical data are stale or missing
-        if: steps.fetch.outputs.result != '0'
-        run: |
-          echo 'Critical data freshness/availability failed. Original dates retained. No website deployment.'
-          exit 1
+          echo 'Daily source/gate failed. No data branch or production site was modified. Inspect failure.json and update-attempt.json. Do not retry official 403/429 or accept revisions automatically.' >> "$GITHUB_STEP_SUMMARY"
