@@ -9,7 +9,7 @@ async function go(page,name){
   await expect(page.locator('.page-top h1')).toHaveText(name);
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await expect.poll(()=>page.locator('.sidebar').evaluate(e=>e.getBoundingClientRect().right)).toBeLessThanOrEqual(1);
 }
-for(const width of [320,390,1440])test(`${width}px: pinned observation RC assets, features and scope`,async({page})=>{
+for(const width of [320,375,390,430,1440])test(`${width}px: pinned observation RC assets, features and scope`,async({page})=>{
   await page.setViewportSize({width,height:844});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const failures=[];page.on('response',r=>{if(r.status()>=400)failures.push(r.url())});
@@ -75,4 +75,64 @@ test('wrong frontend manifest and dated versions fail closed',async({page})=>{
  await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
  await expect(page.locator('.global-error')).toContainText('manifest');
  await expect(page.locator('.data-banner')).toContainText(manifest.asOf);
+});
+
+// Issue #7: real daily-loader path with merged mobile UI; offline responses only.
+import {heatmapOverviewCases} from './heatmap-overview-cases.js';
+import crypto from 'node:crypto';
+heatmapOverviewCases(actualMarket,{rc:true});
+for(const width of [320,375,390,430,1440])test(`integration ${width}px: mixed source dates suppress up/down/flat`,async({page})=>{
+  const p=structuredClone(actualMarket),m=structuredClone(manifest),day='2026-10-12';
+  const version=p.stocks.filter(s=>s.market==='TPEx').flatMap(s=>s.history).find(r=>r.date===day&&r.close>0).sourceVersion;
+  Object.assign(p.sources.tpexQuotes,{asOf:day,sha256:version});
+  p.research.markets.TPEx.asOf=day;p.research.markets.TPEx.sessions=p.research.markets.TPEx.sessions.filter(d=>d<=day);
+  for(const s of p.stocks.filter(s=>s.market==='TPEx'))s.history=s.history.filter(r=>r.date<=day);
+  const body=JSON.stringify(p),digest=crypto.createHash('sha256').update(body).digest('hex');
+  m.publishedDataSha256=digest;m.assets['market.json']=digest;
+  Object.assign(m.sourceVersions.tpexQuotes,{asOf:day,sha256:version});
+  await page.route('**/release-manifest.json*',r=>r.fulfill({json:m}));
+  await page.route('**/market.json*',r=>r.fulfill({body,contentType:'application/json'}));
+  await page.setViewportSize({width,height:844});await loaded(page);
+  await expect(page.locator('.global-error')).toHaveCount(0);
+  await expect(page.locator('.daily-breadth')).toContainText('上市櫃日期不一致');
+  await go(page,'台股熱力圖');
+  await expect(page.locator('.heatmap-summary')).toContainText('上漲 — ／ 下跌 — ／ 平盤 —');
+  await expect(page.locator('.heatmap-summary')).toContainText('上市櫃日期不一致');
+});
+for(const missing of ['manifest','hash'])test(`integration missing ${missing}: fail closed initially and retain verified snapshot on refresh`,async({page})=>{
+  const reject=()=>page.route('**/release-manifest.json*',r=>missing==='manifest'?r.fulfill({status:404,body:'missing'}):r.fulfill({json:{...manifest,publishedDataSha256:undefined}}));
+  await reject();await page.goto('./');await expect(page.locator('.global-error')).toContainText('manifest');
+  await expect(page.locator('.data-banner')).toContainText('尚未載入');
+  await page.unroute('**/release-manifest.json*');await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
+  await expect(page.locator('.data-banner')).toContainText(manifest.asOf);
+  await reject();await page.getByRole('button',{name:'重新讀取盤後快照'}).click();
+  await expect(page.locator('.global-error')).toContainText('manifest');
+  await expect(page.locator('.data-banner')).toContainText(manifest.asOf);
+});
+test('integration daily keyboard, drawer focus and full verified identity',async({page})=>{
+  await page.setViewportSize({width:390,height:844});await loaded(page);
+  const search=page.locator('#stock-search');await search.fill('2330');
+  await page.evaluate(()=>{Object.defineProperty(visualViewport,'height',{configurable:true,get:()=>500});visualViewport.dispatchEvent(new Event('resize'))});
+  await expect(page.locator('.bottom-nav')).toBeHidden();
+  await page.getByRole('button',{name:'收起搜尋鍵盤',exact:true}).click();
+  await expect(search).toHaveValue('2330');await expect(search).not.toBeFocused();await expect(page.locator('.bottom-nav')).toBeVisible();
+  await page.locator('.search-results button').first().click();
+  const drawer=page.getByRole('dialog'),close=drawer.getByRole('button',{name:'關閉',exact:true});
+  await expect(close).toBeFocused();await page.keyboard.press('Shift+Tab');
+  expect(await drawer.evaluate(e=>e.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('Tab');await expect(close).toBeFocused();
+  await drawer.evaluate(e=>{e.scrollTop=e.scrollHeight});await expect(close).toBeInViewport();
+  await page.keyboard.press('Escape');await expect(search).toBeFocused();
+  expect(await page.evaluate(()=>document.body.style.position)).toBe('');
+  await page.locator('.version-details summary').click();
+  await expect(page.locator('.version-details')).toContainText(manifest.publishedDataSha256);
+  await expect(page.locator('.version-details')).toContainText(manifest.runId);
+});
+test('integration dated daily snapshot retains explicit age and disabled scope',async({page})=>{
+  await page.clock.setFixedTime(new Date('2026-10-28T10:00:00Z'));await loaded(page);
+  await expect(page.locator('.rc-version')).toContainText('15 個日曆日');
+  await expect(page.locator('.rc-version')).toContainText('不保證最新');
+  await expect(page.locator('.rc-version')).toContainText('信用與 TWSE T86 停用');
+  // Displaying a dated verified observation is not approval for new-day publication.
+  await expect(page.locator('.data-banner')).toContainText('非即時');
 });
