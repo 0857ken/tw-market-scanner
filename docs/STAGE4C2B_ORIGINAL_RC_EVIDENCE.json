@@ -1,0 +1,79 @@
+{
+  "assets": {
+    "acquisition-state.zip": {
+      "bytes": 584913,
+      "sha256": "4f938e7f2d757cb3c1f3de9ea3989be10c63243db12a868f50b8994571d568d0"
+    },
+    "candidate-receipt.json": {
+      "bytes": 3642,
+      "sha256": "7155108b8ddd5301d38d8855f371e0f76eaa15180214e2984a593025ca262d11"
+    },
+    "site.zip": {
+      "bytes": 413691,
+      "sha256": "7621524742b25dfaa7a7216ca5f5b5006719a252966a0554ff7d0416c3262eee"
+    },
+    "supporting-material.zip": {
+      "bytes": 419518,
+      "sha256": "d8465510a71126ad51b53303c291331608b14034aeee90f060d17c4655b4d994"
+    }
+  },
+  "files": {
+    ".nojekyll": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "assets/charts-BShfMMuG.js": {
+      "bytes": 439447,
+      "sha256": "e62952491c1171e23ffde5a1c0844b64fdbadba1c9dc0a0d7c4882ce54252673"
+    },
+    "assets/index-BrtoXf2j.css": {
+      "bytes": 25466,
+      "sha256": "c88d6f56de9fc112b1dd630a691e6f9c52f26f747799b049c393a8135dc0ff3a"
+    },
+    "assets/index-CQBtED87.js": {
+      "bytes": 89543,
+      "sha256": "4f2bb3d7799c332deff3d979b927b47e14ea5b3a966acd48cba6cb0116e670cb"
+    },
+    "assets/react-CLFjDR3m.js": {
+      "bytes": 142031,
+      "sha256": "6d8b819e4c691335ca17723a8f0e6cc20ab049caa3e09b5162ac7d91b5050dcf"
+    },
+    "index.html": {
+      "bytes": 1050,
+      "sha256": "97661af06ba880cdf7e788769ab55118b58b8b1c6ac7c4d158656cc482127239"
+    },
+    "market.json": {
+      "bytes": 3398282,
+      "sha256": "bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9"
+    },
+    "release-manifest.json": {
+      "bytes": 3886,
+      "sha256": "53e76c526a7a58da29f14862b496d8111f5df275fbbab905c7bc989633c9cf02"
+    }
+  },
+  "frozenCodeInventory": {
+    "frontend/src/logic.js": "aff5873fd5366dfc918e53161832b0646aa214ae00d14e2a9734acc1a50c88b6",
+    "frontend/src/research.js": "3429916a836e1d15ca5fe6782555ba4c16cf04c1530ae786b68d484975787de9",
+    "pipeline/observation_release.py": "39afb15d82b4dfbfca6ccac6a31cd433948e629db35b5dad74ac23de45ad530a",
+    "pipeline/parsers.py": "1a685e0ea3260a4c6bc6500625b8c1e1b24974df7804453b07906471769e8d0c",
+    "pipeline/release_check.py": "19f126c1484ed4fbac625b9b87d54f57c00b7414a73a12b44ddb5edf5ca46e58",
+    "pipeline/research.py": "d7b87242fe24642b42eb1bd0b06b97b12cba7f80f1f85e0cbdbf7578e729070c",
+    "pipeline/schema.py": "3d78b40639859181c420f09ff910bd13114c77604b8ea907bc7833312e853792"
+  },
+  "liveHttpsAcceptance": "BLOCKED: must be performed in separately authorized 4C-2C",
+  "manifestSha256": "53e76c526a7a58da29f14862b496d8111f5df275fbbab905c7bc989633c9cf02",
+  "originalArtifactId": 11862513391,
+  "originalCommit": "82b1749a2626ce30d6196a101577b8bb09273c31",
+  "originalPagesRunId": 38496725153,
+  "originalRunId": 38494657009,
+  "originalZipBytes": 413691,
+  "originalZipSha256": "7621524742b25dfaa7a7216ca5f5b5006719a252966a0554ff7d0416c3262eee",
+  "pagesDeployed": false,
+  "projectionReproduced": true,
+  "publicDataSha256": "bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9",
+  "remoteReleasesInitialized": false,
+  "remoteStateInitialized": false,
+  "responseBodiesArchived": false,
+  "schemaVersion": 1,
+  "scope": "original-byte preservation and offline legacy closure, not remote initialization/live acceptance"
+}
