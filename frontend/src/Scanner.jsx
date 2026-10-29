@@ -1,3 +1,4 @@
+import {industryLabel,industryGroupLabel} from './industry-labels.js';
 import {MARKET_NAMES,BASIS_NAMES,securityKey,memberOn,marketMeta,breakoutSelection} from './research.js';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import {
@@ -241,7 +242,7 @@ function Heatmap({ market, signals, us, onStock }) {
   const up=population.filter(r=>r.change>0).length,down=population.filter(r=>r.change<0).length;
   return <><Panel className="heatmap-panel" title={tw ? '台股漲跌熱力圖' : '美股觀察池熱力圖'} subtitle={`${tw?'台股紅漲綠跌':'美股綠漲紅跌'} · 全部可用時以官方普通股數×收盤價為市值；缺市值時全母體採等權`} right={<Pill tone={market.mode === 'demo' ? 'warn':'neutral'}>{market.mode === 'demo'?'虛構示範':'匯入資料'}</Pill>}>
     {!tw && <div className="tip"><Info size={14}/> 此頁不是完整 S&P 500 成分股。沒有美股資料時不以台股或隨機行情偽裝完整指數。</div>}
-    <div className="filters"><label>產業 <select aria-label="產業" value={activeSector} onChange={e=>setSector(e.target.value)}>{sectors.map(v=><option key={v}>{v}</option>)}</select></label><label>排序與入選（非面積） <select aria-label="排序與入選（非面積）" value={rank} onChange={e=>setRank(e.target.value)}><option>市值</option><option>漲跌幅</option></select></label>
+    <div className="filters"><label>產業 <select aria-label="產業" value={activeSector} onChange={e=>setSector(e.target.value)}>{sectors.map(v=><option key={v} value={v}>{v==='全部'?v:industryGroupLabel(v,raw.filter(r=>(r.sector || '未分類')===v))}</option>)}</select></label><label>排序與入選（非面積） <select aria-label="排序與入選（非面積）" value={rank} onChange={e=>setRank(e.target.value)}><option>市值</option><option>漲跌幅</option></select></label>
       {tw&&<label>顯示檔數 <select aria-label="顯示檔數" value={limit} onChange={e=>setChosenLimit(e.target.value)}><option>100</option><option>300</option><option>全部</option></select></label>}</div>
     <div className="heatmap-summary" role="status">
       <strong>{rank}排序{limit==='全部'?'全部':`前${limit}`} · 目前顯示 {treemap.length} 檔／符合條件 {ranked.length} 檔</strong>
@@ -253,7 +254,7 @@ function Heatmap({ market, signals, us, onStock }) {
     {treemap.length ? <div className="heatmap"><ResponsiveContainer width="100%" height="100%"><Treemap data={treemap} dataKey="size" nameKey="symbol" content={<HeatContent openStock={onStock?(id,target)=>{const stock=signals.latest.find(s=>securityKey(s)===id);if(stock)onStock(stock,target)}:undefined}/>} isAnimationActive={false}/></ResponsiveContainer></div>
       : <Empty title="未接入市場資料" detail={us?'匯入資料需包含 usStocks 才會顯示美股行情。':'匯入有效上市櫃個股收盤資料後即可顯示。'}/>}
   </Panel>
-  <Panel title="漲跌排行"><DataGrid rows={ranked.slice(0,25)} columns={[nameCol,changeCol,{key:'sector',name:'產業',render:r=>r.sector || '—'},{key:'marketCapM',name:'市值權重',render:r=>format(r.marketCapM)}]} onRow={tw ? onStock:undefined}/></Panel>
+  <Panel title="漲跌排行"><DataGrid rows={ranked.slice(0,25)} columns={[nameCol,changeCol,{key:'sector',name:'產業',render:r=>industryLabel(r)},{key:'marketCapM',name:'市值權重',render:r=>format(r.marketCapM)}]} onRow={tw ? onStock:undefined}/></Panel>
   </>;
 }
 function BreakoutView({ signals, onStock }) {
@@ -334,9 +335,9 @@ function SectorView({ signals, onStock }) {
     avgChange:avg(g.stocks.map(s=>s.change).filter(numeric)), capWeighted:(()=>{const eligible=g.stocks.filter(s=>numeric(s.change)&&numeric(s.marketCapM));const total=eligible.reduce((a,s)=>a+s.marketCapM,0);return total?eligible.reduce((a,s)=>a+s.change*s.marketCapM,0)/total:null;})(),stocks:g.stocks
   })).sort((a,b)=>(b.avgChange??-Infinity)-(a.avgChange??-Infinity));
   return <><Panel title="產業輪動" subtitle="預設用等權平均漲跌幅，避免少數權值股完全主導；樣本不足時勿外推全產業">
-    <div className="sector-list">{groups.map((s,i)=><div key={s.name} className="sector-row"><span className="sector-index">{String(i+1).padStart(2,'0')}</span><b>{s.name}</b><span className="sector-bar-holder"><i style={{background:candleColor(s.avgChange),width:`${Math.min(100,Math.abs(s.avgChange||0)*12)}%`}}/></span><span className="num" style={{color:candleColor(s.avgChange)}}>{signed(s.avgChange)}</span><span className="muted tiny">{s.advancers}/{s.valid} 有效樣本上漲</span></div>)}</div>
-  </Panel><Panel title="族群明細" subtitle="點選產業列，可展開該產業的成分股"><DataGrid rows={groups} onRow={r => setActiveSector(prev => prev === r.name ? null : r.name)} columns={[{key:'name',name:'產業',left:true},{key:'count',name:'母體檔數'}, {key:'valid',name:'有效檔數'}, {key:'avgChange',name:'等權漲跌',render:r=><Percent value={r.avgChange}/>},{key:'capWeighted',name:'市值加權',render:r=><Percent value={r.capWeighted}/>}]} />
-      {activeSector && <div className="sector-members"><h3>{activeSector} · 成分股</h3><DataGrid rows={groups.find(g=>g.name===activeSector)?.stocks || []} columns={stockCols} onRow={onStock}/></div>}
+    <div className="sector-list">{groups.map((s,i)=><div key={s.name} className="sector-row"><span className="sector-index">{String(i+1).padStart(2,'0')}</span><b>{industryGroupLabel(s.name,s.stocks)}</b><span className="sector-bar-holder"><i style={{background:candleColor(s.avgChange),width:`${Math.min(100,Math.abs(s.avgChange||0)*12)}%`}}/></span><span className="num" style={{color:candleColor(s.avgChange)}}>{signed(s.avgChange)}</span><span className="muted tiny">{s.advancers}/{s.valid} 有效樣本上漲</span></div>)}</div>
+  </Panel><Panel title="族群明細" subtitle="點選產業列，可展開該產業的成分股"><DataGrid rows={groups} onRow={r => setActiveSector(prev => prev === r.name ? null : r.name)} columns={[{key:'name',name:'產業',left:true,render:r=>industryGroupLabel(r.name,r.stocks)},{key:'count',name:'母體檔數'}, {key:'valid',name:'有效檔數'}, {key:'avgChange',name:'等權漲跌',render:r=><Percent value={r.avgChange}/>},{key:'capWeighted',name:'市值加權',render:r=><Percent value={r.capWeighted}/>}]} />
+      {activeSector && <div className="sector-members"><h3>{industryGroupLabel(activeSector,groups.find(g=>g.name===activeSector)?.stocks || [])} · 成分股</h3><DataGrid rows={groups.find(g=>g.name===activeSector)?.stocks || []} columns={stockCols} onRow={onStock}/></div>}
       <div className="tip">目前母體：{signals.latest.length} 檔。完整市場需要涵蓋所有符合資格的標的及正確產業分類。</div>
   </Panel></>;
 }
@@ -367,7 +368,7 @@ function WeeklyView({ market, signals }) {
       <section><h3>01　大盤表現</h3><p>加權指數最近 5 個交易日報酬為 <b style={{color:candleColor(week)}}>{signed(week)}</b>，最新點位 <b>{format(last?.close)}</b>。資料觀察至 {readableDate(last?.date)}。</p></section>
       <section><h3>02　市場廣度</h3><p>MA20 站上比例 {format(bNow?.a20,1)}%，相較 5 個交易日前變化 {numeric(changeBreadth)?signed(changeBreadth):'資料不足'}。觀察樣本 {bNow?.n20||0} 檔。</p></section>
       <section><h3>03　信用與波動</h3><p>信用壓力燈號：<b>{LIGHTS[signals.creditNow?.light||'UNKNOWN'].cn}</b>（指標 {format(signals.creditNow?.indicator,4)}）。20 日年化波動率：{format(signals.regime.vol,1)}%。</p></section>
-      <section><h3>04　產業輪動</h3><p>{sectors.length?`依最近五日等權報酬，目前樣本中最強族群為「${sectors[0].name}」(${signed(sectors[0].value)})，最弱為「${sectors.at(-1).name}」(${signed(sectors.at(-1).value)})。`:'尚無足夠資料計算產業週報。'}</p></section>
+      <section><h3>04　產業輪動</h3><p>{sectors.length?`依最近五日等權報酬，目前樣本中最強族群為「${industryGroupLabel(sectors[0].name,signals.latest.filter(s=>(s.sector||'未分類')===sectors[0].name))}」(${signed(sectors[0].value)})，最弱為「${industryGroupLabel(sectors.at(-1).name,signals.latest.filter(s=>(s.sector||'未分類')===sectors.at(-1).name))}」(${signed(sectors.at(-1).value)})。`:'尚無足夠資料計算產業週報。'}</p></section>
       <div className="tip">此報告是輸入資料的描述性統計，不包含任何未接入的新聞、預測或保證獲利的策略。</div>
     </article>
   </Panel>;
@@ -390,7 +391,7 @@ function StockDrawer({ stock, close, watching, toggle }) {
   const calculated=stockMetrics(stock);
   const s=OBSERVATION_ONLY?{...calculated,close:stock.close,date:stock.date,change:stock.change}:calculated;
   return <div className="modal-backdrop" onPointerDown={e=>{backdropStart.current=e.target===e.currentTarget}} onClick={e=>{if(backdropStart.current&&e.target===e.currentTarget)close()}}><aside className="stock-drawer" role="dialog" aria-modal="true" aria-label={`${s.name} 個股明細`} tabIndex={-1} onClick={e=>e.stopPropagation()}>
-    <div className="drawer-head"><div><span className="eyebrow">STOCK RESEARCH</span><h2>{s.symbol} {s.name}</h2><small className="muted">{s.sector}　·　資料日 {s.date || '—'}</small></div><button className="icon-btn" onClick={close} aria-label="關閉"><X size={20}/></button></div>
+    <div className="drawer-head"><div><span className="eyebrow">STOCK RESEARCH</span><h2>{s.symbol} {s.name}</h2><small className="muted">{industryLabel(s)}　·　資料日 {s.date || '—'}</small></div><button className="icon-btn" onClick={close} aria-label="關閉"><X size={20}/></button></div>
     <div className="stock-price"><b>{format(s.close,2)}</b><Percent value={s.change}/><button className={`fav-btn ${watching?'active':''}`} onClick={()=>toggle(securityKey(s))}><Star size={17} fill={watching?'currentColor':'none'}/>{watching?'已關注':'加入關注'}</button></div>
     <div className="drawer-stats">{[['MA20',s.ma20],['MA60',s.ma60],['MA120',s.ma120],['MA240',s.ma240],['量比',s.volRatio]].map(([k,v])=><div key={k}><span>{k}</span><b>{OBSERVATION_ONLY?'停用':format(v,2)}{!OBSERVATION_ONLY&&k==='量比'&&numeric(v)?'x':''}</b></div>)}</div>
     <p className="muted">均線：{BASIS_NAMES[s.indicatorBasis]||'未還原'} · 價格與走勢圖：未還原成交價。{s.maReasons?.[240]}</p><Panel title="未還原收盤走勢"><Spark rows={(s.history||[]).slice(-120)} valueKey="close" color="#8f9bfa" height={200} /></Panel>
