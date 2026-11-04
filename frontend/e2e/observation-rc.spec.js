@@ -1,7 +1,9 @@
 import {test,expect} from '@playwright/test';
+import {industryLabelCases} from './industry-label-cases.js';
 import fs from 'node:fs';
 const manifest=JSON.parse(fs.readFileSync(new URL('../dist-rc/release-manifest.json',import.meta.url)));
 const actualMarket=JSON.parse(fs.readFileSync(new URL('../dist-rc/market.json',import.meta.url)));
+industryLabelCases(actualMarket);
 async function loaded(page){await page.goto('./');await expect(page.locator('.data-banner')).toContainText(manifest.asOf);}
 async function go(page,name){
   if(await page.getByRole('button',{name:'開啟選單',exact:true}).isVisible())await page.getByRole('button',{name:'開啟選單',exact:true}).click();
