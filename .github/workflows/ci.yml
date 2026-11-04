@@ -31,17 +31,30 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m scripts.audit_workflows
       - run: npm ci --prefix frontend --no-audit --no-fund
-      - run: npm test
-      - run: npm run build
-      - run: node scripts/audit-built.mjs
       - run: npx --prefix frontend playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - name: Build pinned observation candidate (no publication)
-        run: npm run build:rc
+      - name: Full Python and frontend validation (one runner)
+        shell: bash
         env:
-          RC_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      - run: npm run test:rc:e2e
-      - run: node scripts/audit-rc.mjs
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          # Keep Python's temporary Git fixtures separate from frontend build outputs.
+          python_tree="$RUNNER_TEMP/python-tests"
+          git worktree add --detach "$python_tree" HEAD
+          (cd "$python_tree" && python3 -m scripts.publication_tests --all \
+            --output "$GITHUB_WORKSPACE/test-results/stage4c2b-matrix.json") &
+          python_pid=$!
+          trap 'kill "$python_pid" 2>/dev/null || true' EXIT
+
+          npm test --prefix frontend
+          npm run build
+          node scripts/audit-built.mjs
+          npm run test:e2e
+          RC_COMMIT_SHA="$CANDIDATE_SHA" npm run build:rc
+          npm run test:rc:e2e
+          node scripts/audit-rc.mjs
+          # A failed matrix must fail the job before daily validation or RC upload.
+          wait "$python_pid"
+          trap - EXIT
       - name: Fixed daily frontend candidate and offline E2E dry-run
         run: |
           node scripts/build-daily-seed.mjs
