@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
@@ -14,6 +15,10 @@ export default defineConfig({
   }],
   build: {
     rollupOptions: {
+      input: {
+        scanner: fileURLToPath(new URL('./index.html', import.meta.url)),
+        reboundMap: fileURLToPath(new URL('./rebound-map/index.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';

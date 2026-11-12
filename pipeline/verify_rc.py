@@ -17,11 +17,11 @@ def verify(path, zip_sha256, commit, data_sha256, as_of):
     if len(body) > 16*1024*1024 or hashlib.sha256(body).hexdigest() != zip_sha256:
         raise ValueError('RC ZIP SHA mismatch or size exceeded')
     with zipfile.ZipFile(path) as archive:
-        if any(i.is_dir() and i.filename != 'assets/' for i in archive.infolist()):
+        if any(i.is_dir() and i.filename not in ('assets/', 'rebound-map/') for i in archive.infolist()):
             raise ValueError('Unapproved ZIP directory')
         entries = [i for i in archive.infolist() if not i.is_dir()]
         names = [i.filename for i in entries]
-        allowed = lambda n: n in ('index.html','market.json','release-manifest.json','.nojekyll') or bool(re.fullmatch(r'assets/[A-Za-z0-9_.-]+\.(?:js|css)', n))
+        allowed = lambda n: n in ('index.html','rebound-map/index.html','market.json','release-manifest.json','.nojekyll') or bool(re.fullmatch(r'assets/[A-Za-z0-9_.-]+\.(?:js|css)', n))
         if len(names) != len(set(names)) or not all(allowed(n) for n in names):
             raise ValueError('Duplicate or unapproved ZIP resources')
         if sum(i.file_size for i in archive.infolist()) > 8*1024*1024 or any(stat.S_ISLNK(i.external_attr >> 16) for i in entries):

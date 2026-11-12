@@ -11,7 +11,7 @@ const manifest=JSON.parse(fs.readFileSync(path.join(dist,'release-manifest.json'
 assert.ok(!fs.existsSync(path.join(dist,'market.example.json')));
 for(const [relative,expected] of Object.entries(manifest.assets)){
   assert.ok(!relative.includes('..')&&!path.isAbsolute(relative));
-  assert.ok(['market.json','index.html','.nojekyll'].includes(relative)||/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(relative),'Unexpected candidate asset');
+  assert.ok(['market.json','index.html','rebound-map/index.html','.nojekyll'].includes(relative)||/^assets\/[A-Za-z0-9_.-]+\.(?:js|css)$/.test(relative),'Unexpected candidate asset');
   assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(dist,relative))).digest('hex'),expected);
 }
 assert.equal(manifest.publishedDataSha256,manifest.assets['market.json']);

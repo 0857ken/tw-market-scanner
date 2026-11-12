@@ -9,8 +9,9 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'
 http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(!url.pathname.startsWith(prefix)){res.writeHead(302,{Location:prefix});res.end();return;}
-  const relative=decodeURIComponent(url.pathname.slice(prefix.length))||'index.html';
-  const file=path.resolve(root,relative);
+  const relative=decodeURIComponent(url.pathname.slice(prefix.length));
+  const entry=relative.endsWith('/')||!relative?relative+'index.html':relative;
+  const file=path.resolve(root,entry);
   if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);res.end('Not found');return;}
   res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});
   fs.createReadStream(file).pipe(res);
