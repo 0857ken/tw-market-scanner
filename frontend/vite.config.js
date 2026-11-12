@@ -21,6 +21,7 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
+          if (id.endsWith('/rebound-map/public-snapshot.json')) return 'rebound-public-data';
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
           if (/node_modules\/(recharts|recharts-scale|d3-[^/]+|lodash|victory-vendor|decimal\.js-light|react-smooth|react-transition-group|react-is|dom-helpers)\//.test(id)) return 'charts';
         }
