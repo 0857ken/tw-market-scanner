@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
@@ -14,8 +15,13 @@ export default defineConfig({
   }],
   build: {
     rollupOptions: {
+      input: {
+        scanner: fileURLToPath(new URL('./index.html', import.meta.url)),
+        reboundMap: fileURLToPath(new URL('./rebound-map/index.html', import.meta.url)),
+      },
       output: {
         manualChunks(id) {
+          if (id.endsWith('/rebound-map/public-snapshot.json')) return 'rebound-public-data';
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
           if (/node_modules\/(recharts|recharts-scale|d3-[^/]+|lodash|victory-vendor|decimal\.js-light|react-smooth|react-transition-group|react-is|dom-helpers)\//.test(id)) return 'charts';
         }

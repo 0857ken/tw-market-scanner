@@ -1,0 +1,306 @@
+{
+  "price_as_of": "2026-11-11",
+  "rows": [
+    {
+      "date": "2026-11-02",
+      "open": 45034.53,
+      "high": 45156.17,
+      "low": 44399.1,
+      "close": 44920.14,
+      "turnover": 799687507911
+    },
+    {
+      "date": "2026-11-03",
+      "open": 44481.59,
+      "high": 44614.64,
+      "low": 43191.58,
+      "close": 43307.54,
+      "turnover": 1002035660990
+    },
+    {
+      "date": "2026-11-04",
+      "open": 43449.45,
+      "high": 43741.54,
+      "low": 41855.82,
+      "close": 42948.91,
+      "turnover": 1176930442854
+    },
+    {
+      "date": "2026-11-05",
+      "open": 42666.13,
+      "high": 42873.81,
+      "low": 41513.57,
+      "close": 41574.72,
+      "turnover": 987098883153
+    },
+    {
+      "date": "2026-11-06",
+      "open": 38915.76,
+      "high": 40435.83,
+      "low": 37837.05,
+      "close": 39701.64,
+      "turnover": 1321071858650
+    },
+    {
+      "date": "2026-11-09",
+      "open": 40347.28,
+      "high": 42349.36,
+      "low": 40347.28,
+      "close": 41661.7,
+      "turnover": 877025617232
+    },
+    {
+      "date": "2026-11-10",
+      "open": 42130.33,
+      "high": 43135.92,
+      "low": 41930.03,
+      "close": 42711.92,
+      "turnover": 1034012240502
+    },
+    {
+      "date": "2026-11-11",
+      "open": 43135.76,
+      "high": 44257.15,
+      "low": 42708.05,
+      "close": 44257.15,
+      "turnover": 876295459349
+    }
+  ],
+  "signals": [
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": null,
+      "high_turnover_fall": null,
+      "lower_wick": null,
+      "down4": null,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": true,
+      "high_turnover_fall": null,
+      "lower_wick": false,
+      "down4": null,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": false,
+      "high_turnover_fall": null,
+      "lower_wick": true,
+      "down4": null,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": true,
+      "high_turnover_fall": null,
+      "lower_wick": false,
+      "down4": null,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": true,
+      "high_turnover_fall": null,
+      "lower_wick": true,
+      "down4": true,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": false,
+      "high_turnover_fall": null,
+      "lower_wick": false,
+      "down4": false,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": false,
+      "high_turnover_fall": null,
+      "lower_wick": false,
+      "down4": false,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    },
+    {
+      "seasonal_touch": null,
+      "margin_drop_2": null,
+      "margin_drop5_5": null,
+      "drawdown10": null,
+      "drawdown7": null,
+      "kd_k20": null,
+      "day_drop3": false,
+      "high_turnover_fall": null,
+      "lower_wick": false,
+      "down4": false,
+      "foreign_sell5": null,
+      "foreign_sell8": null,
+      "foreign_large_sell": null,
+      "foreign_turn_buy": null,
+      "futures_short_high": null
+    }
+  ],
+  "signal_labels": {
+    "seasonal_touch": "盤中觸及季線且季線高於半年線",
+    "margin_drop_2": "融資單日下降 ≥2%",
+    "margin_drop5_5": "融資五日下降 ≥5%",
+    "drawdown10": "距20日高點下降 ≥10%",
+    "drawdown7": "距20日高點下降 ≥7%",
+    "kd_k20": "隨機指標 K ≤20（9,3,3）",
+    "day_drop3": "當日收盤跌幅 ≥3%",
+    "high_turnover_fall": "下跌且成交額 > 前20日均額 1.4倍",
+    "lower_wick": "收盤弱勢且下影長度 ≥前收 1.2%",
+    "down4": "連續收盤下跌 ≥4 日",
+    "foreign_sell5": "外資連賣 ≥5日",
+    "foreign_sell8": "外資連賣 ≥8日",
+    "foreign_large_sell": "外資單日賣超 >1500億元",
+    "foreign_turn_buy": "外資連賣至少2日後首日轉買（自訂）",
+    "futures_short_high": "外資台指期淨空單創前60日新高"
+  },
+  "sources": [
+    {
+      "id": "11755",
+      "name": "發行量加權股價指數歷史資料",
+      "agency": "金融監督管理委員會證券期貨局",
+      "origin": "臺灣證券交易所",
+      "dataset_url": "https://data.gov.tw/dataset/11755",
+      "raw_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?response=open_data",
+      "raw_sha256": "1bbd678558c60825061d044dbe3140d473005f1865451c3d0eb397bc25e0b5c2",
+      "first_date": "2026-11-02",
+      "last_date": "2026-11-11",
+      "license": {
+        "name": "政府資料開放授權條款－第1版",
+        "url": "https://data.gov.tw/license"
+      }
+    },
+    {
+      "id": "11672",
+      "name": "盤後資訊 > 每日市場成交資訊",
+      "agency": "金融監督管理委員會證券期貨局",
+      "origin": "臺灣證券交易所",
+      "dataset_url": "https://data.gov.tw/dataset/11672",
+      "raw_url": "https://www.twse.com.tw/exchangeReport/FMTQIK?response=open_data",
+      "raw_sha256": "0b9856a349aeb12b9627dd3ecd84bfdb57eb9de1dd755c05c5085b638800eef5",
+      "first_date": "2026-11-02",
+      "last_date": "2026-11-11",
+      "license": {
+        "name": "政府資料開放授權條款－第1版",
+        "url": "https://data.gov.tw/license"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "date": "2026-11-02",
+      "ohlc_close": "44920.14",
+      "turnover_close": "44920.14",
+      "match": true
+    },
+    {
+      "date": "2026-11-03",
+      "ohlc_close": "43307.54",
+      "turnover_close": "43307.54",
+      "match": true
+    },
+    {
+      "date": "2026-11-04",
+      "ohlc_close": "42948.91",
+      "turnover_close": "42948.91",
+      "match": true
+    },
+    {
+      "date": "2026-11-05",
+      "ohlc_close": "41574.72",
+      "turnover_close": "41574.72",
+      "match": true
+    },
+    {
+      "date": "2026-11-06",
+      "ohlc_close": "39701.64",
+      "turnover_close": "39701.64",
+      "match": true
+    },
+    {
+      "date": "2026-11-09",
+      "ohlc_close": "41661.70",
+      "turnover_close": "41661.70",
+      "match": true
+    },
+    {
+      "date": "2026-11-10",
+      "ohlc_close": "42711.92",
+      "turnover_close": "42711.92",
+      "match": true
+    },
+    {
+      "date": "2026-11-11",
+      "ohlc_close": "44257.15",
+      "turnover_close": "44257.15",
+      "match": true
+    }
+  ]
+}

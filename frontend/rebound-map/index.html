@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>台股反彈地圖 R3.6</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><link rel="stylesheet" href="./style.css"></head><body><main class="wrap"><header><nav aria-label="研究平台"><a class="return-link" href="../">← 返回台股掃描器</a></nav><h1>台股反彈地圖</h1><p class="muted">R3.6 歷史研究快照</p></header>
+<details class="card import-card">
+<summary>選用私人 R3.6 歷史快照</summary>
+<p>選取 R3.6 交付包內的 <code>site/index.html</code>。檔案只在此分頁讀取。</p>
+<label for="snapshot">R3.6 歷史快照 HTML</label> <input type="file" id="snapshot" accept=".html,text/html">
+<p id="import-status" role="status"></p>
+</details>
+<button type="button" id="show-public" hidden>返回公開研究資料</button>
+<section id="workspace" hidden aria-label="歷史研究快照">
+<div>行情日期 <strong id="asof"></strong> · 籌碼日期 <strong id="chip"></strong></div>
+<div class="status" id="status" role="status"></div><h2>已保存行情 · <span id="summary-date"></span></h2><section class="grid" id="metrics" aria-label="最新研究指標"></section>
+<section class="card"><h2>日線與成交金額</h2><div class="controls"><label>顯示範圍<select id="window" aria-label="顯示範圍"><option value="30">近 30 日</option><option value="60" selected>近 60 日</option><option value="120">近 120 日</option></select></label><label>查詢日期<select id="date" aria-label="查詢日期"></select></label></div><svg id="chart" viewBox="0 0 960 380" role="img" aria-label="台股日線與 MA20、MA60、MA120 圖"></svg><input id="cursor" type="range" aria-label="移動交易日"><div id="quote" aria-live="polite"></div><p id="turnover"></p><small>紅漲綠跌　<span class="ma20">MA20</span>　<span class="ma60">MA60</span>　<span class="ma120">MA120</span></small></section>
+<section class="card signals-card"><h2>所選日期的反彈訊號</h2><p id="signal-date"></p><p class="muted">依既有公式計算；籌碼缺漏標示未知，不作交易建議。</p><p id="backtest-note" class="muted"></p><div id="signals" class="grid"></div></section><details id="private-calendar" hidden><summary>交易日曆與資料狀態</summary><div class="card table-wrap"><h2>籌碼覆蓋</h2><ul id="chip-gaps"></ul><table><thead><tr><th>日期</th><th>日曆分類</th><th>資料狀態</th></tr></thead><tbody id="calendar"></tbody></table></div></details>
+<details id="private-scope" hidden><summary>原始資料與研究範圍</summary><div class="card"><p id="scope"></p><p>10/23：依證交所正式公告為颱風臨時休市，沒有 K 線，不補值。</p><p>籌碼尚未更新的日期保留未知；價格指標沿用既有公式重新計算。</p><p>原版研究介面保存在 R3.5 證據目錄；本預覽僅顯示 R3.6 候選資料。</p></div></details>
+<section id="public-sources" aria-labelledby="sources-title">
+<h2 id="sources-title">公開資料來源與授權</h2>
+<ul id="source-links"></ul>
+</section>
+</section></main>
+<script type="module" src="./main.js"></script>
+</body></html>
