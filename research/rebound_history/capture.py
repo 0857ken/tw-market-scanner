@@ -38,6 +38,11 @@ def jobs(series, dates=()):
         for m in range(1, (END.month if y == END.year else 12) + 1):
             yield series, f'{y}-{m:02}', [url(TWSE, path, response='json', date=f'{y}{m:02}01')]
 
+    if series == 'futures':
+        # The public historical window may exclude almost all of 2023.
+        yield 'futures_alternates', '2023-tail', [url(TAIFEX, '/cht/3/futContractsDateDown',
+            queryStartDate='2023/11/17', queryEndDate='2023/12/31', commodityId='TXF')]
+
 
 def capture(root, job):
     series, tag, urls = job

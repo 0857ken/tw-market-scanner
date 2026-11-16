@@ -196,11 +196,19 @@ def assemble(root, excluded_margin_dates=()):
              'calendar':calendar_year,'futures':futures_year}
     for kind,parser in parsers.items():
         groups[kind]={}
-        for _,tag,urls in jobs(kind):
+        for directory,tag,urls in jobs(kind):
+            if directory != kind and '2023' in groups[kind]:
+                continue
             try:
-                groups[kind][tag]=parser(load_source(root,kind,tag),tag)
+                if directory == 'futures_alternates':
+                    partial = parser(load_source(root,directory,tag),'2023')
+                    if not all(date(2023,11,17) <= d <= date(2023,12,31) for d in partial):
+                        raise ValueError('futures alternate coverage outside requested window')
+                    groups[kind]['2023']=partial
+                else:
+                    groups[kind][tag]=parser(load_source(root,directory,tag),tag)
             except (OSError,ValueError,KeyError,TypeError) as exc:
-                errors.append({'source':kind,'key':tag,'url':urls[0],'reason':str(exc)})
+                errors.append({'source':directory,'key':tag,'url':urls[0],'reason':str(exc)})
     rows=[]; day_audit=[]; segment=0
     d=START
     margins={}
