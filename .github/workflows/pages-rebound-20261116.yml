@@ -1,0 +1,236 @@
+name: Rebound map - single approved immutable Pages publication
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type PUBLISH-REBOUND-8a7c0e3 after owner approval'
+        required: true
+        type: string
+      expected_main_sha:
+        description: 'Exact 40-character main SHA approved at launch'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scanner-pages-rebound-approved-20261116
+  cancel-in-progress: false
+
+env:
+  APPROVED_COMMIT: 8a7c0e37640726f8a3c99f8bbf67d2503bd18061
+  ORIGINAL_COMMIT: 39e20c881814b0ffc4bd926a2ba10fbe9c008a44
+  ORIGINAL_BASE: d1a700ffa2c5af42ca1a10ea90877bd3cce7e67a
+  APPROVED_CI_RUN: '43822668123'
+  APPROVED_ARTIFACT_ID: '14204868123'
+  APPROVED_ARTIFACT_SHA256: df5880899ecbd7ba58fd750451b71bbafae88934643ee45744caf77a7837b827
+  APPROVED_DATA_SHA256: bd5c0630bc3424e7c20aed05cf1f8801af90e34bd27563a9743615b907b1d7f9
+  APPROVED_AS_OF: '2026-10-13'
+
+jobs:
+  verify:
+    # Never publish from a feature branch, a stale main, or without the exact explicit approval string.
+    if: >-
+      github.repository == '0857ken/tw-market-scanner' &&
+      github.event.repository.private == false &&
+      github.ref == 'refs/heads/main' &&
+      inputs.confirmation == 'PUBLISH-REBOUND-8a7c0e3' &&
+      inputs.expected_main_sha == github.sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 8a7c0e37640726f8a3c99f8bbf67d2503bd18061
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Recheck main and required commit ancestry (read only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_SHA}" =~ ^[a-f0-9]{40}$ ]]
+          [[ "${{ inputs.expected_main_sha }}" == "$GITHUB_SHA" ]]
+          git fetch --no-tags origin main
+          [[ "$(git rev-parse FETCH_HEAD)" == "$GITHUB_SHA" ]]
+          git merge-base --is-ancestor "$ORIGINAL_BASE" "$GITHUB_SHA"
+          git merge-base --is-ancestor "$ORIGINAL_COMMIT" "$GITHUB_SHA"
+          git merge-base --is-ancestor "$APPROVED_COMMIT" "$GITHUB_SHA"
+          actual=$(gh api repos/0857ken/tw-market-scanner/branches/main --jq .commit.sha)
+          [[ "$actual" == "$GITHUB_SHA" ]]
+          echo 'Reviewed commit chain is on unchanged main; no checkout of a mutable branch.'
+      - name: Verify fixed CI run and exact source artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/0857ken/tw-market-scanner/actions/runs/$APPROVED_CI_RUN" > run.json
+          gh api "repos/0857ken/tw-market-scanner/actions/artifacts/$APPROVED_ARTIFACT_ID" > artifact.json
+          python - <<'PY'
+          import json, os
+          run = json.load(open('run.json'))
+          artifact = json.load(open('artifact.json'))
+          assert run['id'] == int(os.environ['APPROVED_CI_RUN'])
+          assert run['run_attempt'] == 1 and run['event'] == 'pull_request'
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          assert run['head_sha'] == os.environ['APPROVED_COMMIT']
+          assert artifact['id'] == int(os.environ['APPROVED_ARTIFACT_ID'])
+          assert not artifact['expired']
+          assert artifact['workflow_run']['id'] == run['id']
+          assert artifact['workflow_run']['head_sha'] == os.environ['APPROVED_COMMIT']
+          assert artifact['digest'] == 'sha256:' + os.environ['APPROVED_ARTIFACT_SHA256']
+          print('Exact CI attempt and artifact identity PASS.')
+          PY
+      - name: Download the exact preapproved CI ZIP - never rebuild
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/0857ken/tw-market-scanner/actions/artifacts/${APPROVED_ARTIFACT_ID}/zip" \
+            -o approved-ci.zip
+          python -m pipeline.verify_rc approved-ci.zip \
+            --zip-sha256 "$APPROVED_ARTIFACT_SHA256" \
+            --commit "$APPROVED_COMMIT" \
+            --data-sha256 "$APPROVED_DATA_SHA256" \
+            --as-of "$APPROVED_AS_OF"
+      - name: Verify exact entries, archive safety, approved research page and a tar round trip
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json, hashlib, io, tarfile
+          with ZipFile('approved-ci.zip') as z:
+              names = sorted(n for n in z.namelist() if not n.endswith('/'))
+              manifest = json.loads(z.read('release-manifest.json'))
+              assert len(names) == 13
+              assert set(names) == set(manifest['assets']) | {'release-manifest.json'}
+              assert 'rebound-map/index.html' in names
+              assert not any(n.startswith('R36/') or n.startswith('site/') for n in names)
+              assert manifest['candidateCommit'] == '8a7c0e37640726f8a3c99f8bbf67d2503bd18061'
+              assert manifest['deploymentAuthorized'] is False
+              assert manifest['strategyComplete'] is False
+              assert manifest['ageCalendarDays'] == 34
+              assert '4b1-rc1' == manifest['version']  # version label is NOT used as artifact selector
+              assert b'<script id="r35-data"' not in z.read('rebound-map/index.html')
+              assert any('rebound-public-data-' in n for n in names)
+              assert any('reboundMap-' in n and n.endswith('.js') for n in names)
+              site = Path('site')
+              site.mkdir(exist_ok=False)
+              for n in names:
+                  dest = site / n
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(z.read(n))
+              with tarfile.open('roundtrip.tar.gz', 'w:gz') as archive:
+                  for n in names:
+                      archive.add(site / n, arcname=n)
+              with tarfile.open('roundtrip.tar.gz', 'r:gz') as archive:
+                  assert sorted(archive.getnames()) == names
+                  for n in names:
+                      stream = archive.extractfile(n)
+                      assert stream is not None
+                      assert hashlib.sha256(stream.read()).digest() == hashlib.sha256((site / n).read_bytes()).digest()
+              print('All 13 site assets and independent tar round trip PASS; no private snapshot.')
+          PY
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: site
+          include-hidden-files: true
+          retention-days: 1
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Abort if main changed after verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=$(gh api repos/0857ken/tw-market-scanner/branches/main --jq .commit.sha)
+          [[ "$current" == "$GITHUB_SHA" ]] || { echo 'main drifted; abort without deploying'; exit 1; }
+      - id: publish
+        uses: actions/deploy-pages@v5.0.1
+
+  acceptance:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 8a7c0e37640726f8a3c99f8bbf67d2503bd18061
+          persist-credentials: false
+      - name: Retrieve the same preapproved ZIP for read-only HTTPS acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/0857ken/tw-market-scanner/actions/artifacts/${APPROVED_ARTIFACT_ID}/zip" \
+            -o approved-ci.zip
+          python -m pipeline.verify_rc approved-ci.zip \
+            --zip-sha256 "$APPROVED_ARTIFACT_SHA256" \
+            --commit "$APPROVED_COMMIT" \
+            --data-sha256 "$APPROVED_DATA_SHA256" \
+            --as-of "$APPROVED_AS_OF"
+      - name: Two immutable manifest-bracketed HTTPS sweeps (no auto rollback)
+        run: |
+          python - <<'PY'
+          import zipfile, hashlib, json
+          from urllib.request import Request, urlopen
+          from urllib.parse import quote
+          from pathlib import Path
+          base='https://0857ken.github.io/tw-market-scanner/'
+          with zipfile.ZipFile('approved-ci.zip') as z:
+              names=sorted(n for n in z.namelist() if not n.endswith('/'))
+              expected={name:hashlib.sha256(z.read(name)).hexdigest() for name in names}
+          def get(name):
+              req=Request(base+quote(name, safe='/'),headers={'Cache-Control':'no-cache','Pragma':'no-cache'})
+              with urlopen(req,timeout=20) as response:
+                  body=response.read(8*1024*1024)
+                  assert response.status==200 and response.url.startswith(base),name
+                  return body
+          result={'scope':'READ_ONLY_AFTER_DEPLOY','base':base,'sourceCI':43822668123,'sourceArtifact':14204868123,'passes':[]}
+          for sweep in range(2):
+              assert hashlib.sha256(get('release-manifest.json')).hexdigest()==expected['release-manifest.json']
+              checked=[]
+              for name in names:
+                  if name=='.nojekyll':continue
+                  assert hashlib.sha256(get(name)).hexdigest()==expected[name],name
+                  checked.append(name)
+              assert hashlib.sha256(get('release-manifest.json')).hexdigest()==expected['release-manifest.json']
+              assert 'rebound-map/index.html' in checked
+              result['passes'].append({'round':sweep+1,'sha256_verified':checked})
+          Path('live-rebound-acceptance.json').write_text(json.dumps(result,indent=2))
+          print('Two complete immutable HTTPS sweeps PASS. Rollback is a separate owner decision.')
+          PY
+      - name: Archive read-only acceptance proof
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: rebound-live-acceptance
+          path: live-rebound-acceptance.json
+          if-no-files-found: warn
+          retention-days: 7
