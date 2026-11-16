@@ -7,7 +7,7 @@ import unittest
 
 from capture import jobs
 from series import annual_counts, calendar_year, futures_year, load_source, PRICE, price_month, sha
-from study import describe, disjoint, excursion, holm, match_effect
+from study import describe, disjoint, excursion, holm, match_effect, stratum
 
 
 class StudyTest(unittest.TestCase):
@@ -71,6 +71,12 @@ class StudyTest(unittest.TestCase):
         v={k:(r,0,0) for k,r in zip(rows,(2,1,9))}
         self.assertEqual(match_effect([(0,0)],[(0,1),(0,2)],rows,v)['mean_delta_pp'],1)
         self.assertIsNone(match_effect([(0,0)],[(0,2)],rows,v)['mean_delta_pp'])
+
+    def test_matching_bins_are_not_defined_by_trigger_thresholds(self):
+        def regime(daily, drawdown):
+            return stratum({'date':'2024-01-02','day_return':daily,'drawdown20':drawdown})
+        self.assertEqual(regime(-.031,-.101),regime(-.029,-.099))
+        self.assertEqual(regime(-.031,-.071),regime(-.029,-.069))
 
     def test_holm_accounts_for_all_prelisted_slots(self):
         result=holm({'a':.001,'b':.002},105)

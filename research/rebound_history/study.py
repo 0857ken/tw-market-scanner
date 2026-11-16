@@ -14,8 +14,8 @@ from capture import END, STUDY
 from series import annual_counts, assemble, frozen, load_source
 
 HORIZONS=(1,3,5,10,20,40,60)
-MATCH_DAILY=(-.03,-.015,-.005,0,.005,.015,.03)
-MATCH_DRAWDOWN=(-.10,-.07,-.03)
+MATCH_DAILY=(-.045,-.02,-.005,0,.005,.015,.03)
+MATCH_DRAWDOWN=(-.15,-.085,-.05,-.03)
 MIN_BLOCKS=10
 RESAMPLES=9999
 
