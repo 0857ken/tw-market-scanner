@@ -17,7 +17,8 @@ env:
   APPROVED_ZIP: 7621524742b25dfaa7a7216ca5f5b5006719a252966a0554ff7d0416c3262eee
 jobs:
   verify:
-    if: github.repository == '0857ken/tw-market-scanner' && github.ref == 'refs/heads/main' && inputs.confirmation == 'PUBLISH-4b1-rc1'
+    # Retired old 4b1-rc1 publication entry; approval only through pinned rebound release gate.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     permissions:
