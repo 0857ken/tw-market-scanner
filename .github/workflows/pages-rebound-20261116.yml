@@ -145,6 +145,35 @@ jobs:
           path: site
           include-hidden-files: true
           retention-days: 1
+      - name: Fetch the actual Pages artifact just uploaded
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: pages-upload-proof
+      - name: Compare actual uploaded Pages artifact.tar against all 13 approved files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, tarfile
+          site = Path('site')
+          expected = {str(p.relative_to(site)): hashlib.sha256(p.read_bytes()).hexdigest()
+                      for p in site.rglob('*') if p.is_file()}
+          assert len(expected) == 13
+          archive_path = Path('pages-upload-proof/artifact.tar')
+          assert archive_path.is_file(), 'Actual Pages artifact.tar not downloaded'
+          actual = {}
+          with tarfile.open(archive_path, 'r:') as archive:
+              for member in archive:
+                  name = member.name.removeprefix('./')
+                  if member.isdir():
+                      continue
+                  assert member.isfile() and name not in actual and name in expected, name
+                  stream = archive.extractfile(member)
+                  assert stream is not None
+                  actual[name] = hashlib.sha256(stream.read()).hexdigest()
+          assert actual == expected, 'Uploaded Pages tar differs from approved ZIP files'
+          print('ACTUAL UPLOADED PAGES TAR PASS: 13/13 assets exactly match approved source')
+          PY
 
   deploy:
     needs: verify
