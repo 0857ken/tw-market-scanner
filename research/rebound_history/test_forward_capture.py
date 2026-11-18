@@ -28,6 +28,7 @@ class ProspectiveCaptureTests(unittest.TestCase):
             self.assertEqual(report['index_close'],105)
             self.assertTrue(report['retrieval_before_next_open'])
             self.assertFalse(report['pit_qualified'])
+            self.assertFalse(report['frozen_rule_archive_bytes_verified'])
             self.assertEqual(report['status'],'BLOCKED')
             self.assertTrue((directory/'ohlc.body').exists())
             self.assertTrue((directory/'turnover.receipt.json').exists())
@@ -38,6 +39,19 @@ class ProspectiveCaptureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 collect(temp,'2026-11-18','2026-11-19','a'*64,self.fake(True))
             self.assertEqual(list(Path(temp).rglob('status.json')),[])
+
+    def test_frozen_rule_bytes_checked_before_capture(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive=Path(temp)/'frozen.zip'
+            archive.write_bytes(b'approved-archive-fixture')
+            digest=sha256(archive.read_bytes()).hexdigest()
+            path,report=collect(temp,'2026-11-18','2026-11-19',digest,
+                                self.fake(),frozen_archive=archive)
+            self.assertTrue(report['frozen_rule_archive_bytes_verified'])
+            self.assertFalse(report['pit_qualified'])
+            with self.assertRaises(ValueError):
+                collect(temp,'2026-11-18','2026-11-19','a'*64,
+                        self.fake(),frozen_archive=archive)
 
     def test_invalid_date_and_sha_rejected(self):
         with self.assertRaises(ValueError):
