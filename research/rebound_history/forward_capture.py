@@ -52,7 +52,7 @@ def fetch_official(url):
     return body,receipt
 
 
-def collect(root,session,next_session,frozen_sha,fetcher=fetch_official):
+def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_archive=None):
     if not re.fullmatch('[a-f0-9]{64}',frozen_sha):
         raise ValueError('must supply exact frozen-rule archive SHA256')
     day=date.fromisoformat(session)
@@ -63,6 +63,12 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official):
     root=Path(root).resolve()
     if (repo/'.github').exists() and (root==repo or repo in root.parents):
         raise ValueError('private raw capture cannot be stored inside public repository')
+    archive_verified=False
+    if frozen_archive is not None:
+        archive=Path(frozen_archive)
+        if not archive.is_file() or sha256(archive.read_bytes()).hexdigest()!=frozen_sha:
+            raise ValueError('frozen archive bytes do not match pinned hash')
+        archive_verified=True
     sources={}
     for kind,url in source_urls(session).items():
         body,receipt=fetcher(url)
@@ -78,11 +84,12 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official):
         raise ValueError('two TWSE official reports disagree on close')
     last_seen=max(x[3] for x in sources.values()).isoformat()
     gate=prospective_gate(session,next_session,last_seen,anchored=False,
-                          crosschecked=True,frozen=True)
+                          crosschecked=True,frozen=archive_verified)
     gate.update({
         'index_close':price_close,
         'turnover_ntd':sources['turnover'][2]['turnover'],
         'frozen_rule_archive_sha256':frozen_sha,
+        'frozen_rule_archive_bytes_verified':archive_verified,
         'calendar_verified_independently':False,
         'publication_timestamp_verified':False,
         'signal_frozen_before_outcome':False,
@@ -105,8 +112,9 @@ def main():
     p.add_argument('session',help='confirmed TWSE session YYYY-MM-DD')
     p.add_argument('next_session',help='independently checked next TWSE session YYYY-MM-DD')
     p.add_argument('frozen_rule_archive_sha256')
+    p.add_argument('--frozen-archive',type=Path,help='optional reviewed local ZIP, matched by exact SHA256')
     a=p.parse_args()
-    path,gate=collect(a.private_root,a.session,a.next_session,a.frozen_rule_archive_sha256)
+    path,gate=collect(a.private_root,a.session,a.next_session,a.frozen_rule_archive_sha256,frozen_archive=a.frozen_archive)
     print(json.dumps({'saved_to':str(path),'status':gate['status'],'pit_qualified':False},
                      ensure_ascii=False))
 
