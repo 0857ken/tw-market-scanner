@@ -12,10 +12,12 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 import json
 import re
+import shutil
 from io import BytesIO
 from zipfile import ZipFile, BadZipFile
 
 from pit_guard import FROZEN_END, prospective_gate, verify_receipt
+from capture_seal import write_local_seal, verify_local_seal
 from series import price_month
 
 MAX_BYTES=8_000_000
@@ -137,11 +139,22 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_a
     })
     target=root/session/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
                          +'-'+token_hex(4))
-    target.mkdir(parents=True,exist_ok=False)
-    for kind,(body,receipt,_,_) in sources.items():
-        (target/(kind+'.body')).write_bytes(body)
-        (target/(kind+'.receipt.json')).write_text(json.dumps(receipt,indent=2)+'\n')
-    (target/'status.json').write_text(json.dumps(gate,ensure_ascii=False,indent=2)+'\n')
+    target.parent.mkdir(parents=True,exist_ok=True)
+    staged=target.parent/('.pending-'+target.name)
+    staged.mkdir(exist_ok=False)
+    try:
+        for kind,(body,receipt,_,_) in sources.items():
+            (staged/(kind+'.body')).write_bytes(body)
+            (staged/(kind+'.receipt.json')).write_text(json.dumps(receipt,indent=2)+'\n')
+        (staged/'status.json').write_text(json.dumps(gate,ensure_ascii=False,indent=2)+'\n')
+        seal_hash=write_local_seal(staged)
+        verify_local_seal(staged,seal_hash)
+        staged.rename(target)
+    except Exception:
+        shutil.rmtree(staged)
+        raise
+    # This value is returned to the operator; it is not self-referenced in status.json.
+    gate['local_seal_sha256']=seal_hash
     return target,gate
 
 
@@ -154,7 +167,8 @@ def main():
     p.add_argument('--frozen-archive',type=Path,help='optional reviewed local ZIP, matched by exact SHA256')
     a=p.parse_args()
     path,gate=collect(a.private_root,a.session,a.next_session,a.frozen_rule_archive_sha256,frozen_archive=a.frozen_archive)
-    print(json.dumps({'saved_to':str(path),'status':gate['status'],'pit_qualified':False},
+    print(json.dumps({'saved_to':str(path),'local_seal_sha256':gate['local_seal_sha256'],
+                      'status':gate['status'],'pit_qualified':False},
                      ensure_ascii=False))
 
 
