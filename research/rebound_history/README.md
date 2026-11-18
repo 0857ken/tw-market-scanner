@@ -20,3 +20,20 @@ Run the local suite with `python3 -m unittest discover -s research/rebound_histo
 - Index points, NTD turnover, market margin in NTD 100 million per frozen input, and exact TXF foreign long/short position counts. No substitute series. Margin inputs use the date's own report, leaving next-report revisions for quality diagnostics.
 
 Private source, captures, detailed results and their rights remain outside public Git. No automatic run or publication integration is configured.
+
+## Next-open sensitivity (descriptive only)
+
+Run `python3 research/rebound_history/sensitivity.py RAW PRIVATE_ARCHIVE APPROVED_ARCHIVE_SHA256 OUT.csv`
+with all input/output files **outside** the public Git worktree. Use the same
+preapproved frozen archive and identical `--exclude-margin-date DATE` flags
+as the five-year exploration. The module recalculates the original frozen
+signals without changing the 15 predicates, measuring the T+1 opening TAIEX
+index to T+h closing TAIEX index return for horizons 1/3/5/10/20/40/60.
+Segment boundaries, expired exits and missing signal data fail closed.
+
+**This is only a price-index entry-timing sensitivity.** The index cannot
+itself be traded; publication timestamps, historical as-of revisions, actual
+fills, fees, slippage and true out-of-sample predictive ability have not been
+independently validated. The module always writes `pit_qualified_n = 0` and
+`EXPLORATORY_INDEX_PROXY_NOT_PIT`, never an approved strategy label. No new
+permissions, automatic capture, schedule or website publication are involved.
