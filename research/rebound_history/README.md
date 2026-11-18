@@ -86,3 +86,31 @@ publication/version timing, verified exchange calendar, a pre-outcome frozen
 signal decision, genuinely future matured outcomes and an executable
 instrument/cost model all require separate review. Until then both historical
 PIT and true out-of-sample strategy validity remain BLOCKED.
+
+
+## Tamper-evident local observation capsule (manual, not PIT)
+
+Each successful prospective capture now writes the two raw TWSE bodies, two
+complete HTTP receipts, and its PIT_BLOCKED status into a uniquely named
+staging directory. It cross-checks those five files, creates a deterministic
+SEAL.json file with their SHA256 digests, validates the seal, then atomically
+renames the staging directory into its final private location. A failed
+validation removes the staging directory; older completed captures are not
+overwritten. The command prints local_seal_sha256 for separate safekeeping.
+
+Recheck a capsule later:
+
+    python3 research/rebound_history/capture_seal.py PRIVATE_CAPSULE_DIRECTORY --seal-sha256 PREVIOUSLY_RETAINED_SEAL_SHA256
+
+The checker rejects missing, unexpected, symlinked, size-over-limit or
+tampered files, inconsistent TWSE closing prices, unapproved status labels,
+and receipt/session mismatches. The optional expected digest must be
+previously recorded separately; merely retaining an unanchored local file
+and digest together is not independent tamper or time attestation.
+
+This is LOCAL_INTEGRITY_ONLY_PIT_BLOCKED, **not proof of the original
+publication time, durable external timestamp or an actual pre-outcome
+forecast**. A future human/independent audit must provide an external
+timestamp anchor and original source availability proof before considering
+any PIT candidate. No schedule, Secrets, public data or live deployment
+are created by this feature.
