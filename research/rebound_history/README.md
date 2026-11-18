@@ -66,9 +66,12 @@ The operator must confirm NEXT_SESSION independently (weekend/holiday
 arithmetic is insufficient).
 Optional: add --frozen-archive APPROVED_PRIVATE_ARCHIVE.zip to the capture
 command. Without this argument, a 64-digit hash is only an unverified reference
-and frozen-rule evidence remains false. With the option, the actual private
-archive bytes must match the supplied SHA256 before any official fetch occurs.
-Even byte-level matching is not proof of the external timestamp of the freeze.
+and frozen-rule evidence remains false. With the option, before any official
+fetch the tool now verifies both the full private ZIP SHA256 and every member
+named by data/r25_frozen_rules.json, including the frozen backtest script,
+and requires exactly 15 frozen signal names. A self-declared manifest or hash
+is still not independently authenticated approval, and neither proves when
+those rules were originally frozen. Every record stays PIT_BLOCKED.
  The capture checks the session-specific OHLC and
 turnover response, enforces exact two-source closing-price agreement, and
 writes both source bodies, receipts, and their SHA256 to a new unique folder
