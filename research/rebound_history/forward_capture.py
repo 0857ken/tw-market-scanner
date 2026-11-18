@@ -12,6 +12,8 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 import json
 import re
+from io import BytesIO
+from zipfile import ZipFile, BadZipFile
 
 from pit_guard import FROZEN_END, prospective_gate, verify_receipt
 from series import price_month
@@ -52,6 +54,43 @@ def fetch_official(url):
     return body,receipt
 
 
+
+def verify_frozen_archive(path, approved_sha):
+    """Check exact ZIP bytes, manifest and all pinned members (not external approval)."""
+    archive=Path(path)
+    if not archive.is_file() or archive.stat().st_size>64_000_000:
+        raise ValueError('frozen archive absent or too large')
+    body=archive.read_bytes()
+    if sha256(body).hexdigest()!=approved_sha:
+        raise ValueError('frozen archive SHA256 mismatch')
+    try:
+        with ZipFile(BytesIO(body)) as z:
+            names=z.namelist()
+            if len(names)!=len(set(names)):
+                raise ValueError('duplicate frozen ZIP paths')
+            frozen=json.loads(z.read('data/r25_frozen_rules.json'))
+            files=frozen.get('files_sha256')
+            if (not isinstance(files,dict) or not files or
+                'tools/backtest.py' not in files or
+                len(frozen.get('signal_keys',[]))!=15 or
+                not isinstance(frozen.get('basis_as_of'),str)):
+                raise ValueError('incomplete frozen rules manifest')
+            total=0
+            for name,digest in files.items():
+                if (not isinstance(name,str) or name.startswith('/') or
+                    '..' in name.split('/') or not re.fullmatch('[a-f0-9]{64}',str(digest))):
+                    raise ValueError('invalid frozen member')
+                info=z.getinfo(name)
+                total+=info.file_size
+                if info.file_size>16_000_000 or total>64_000_000:
+                    raise ValueError('frozen member exceeds size budget')
+                if sha256(z.read(name)).hexdigest()!=digest:
+                    raise ValueError('frozen member SHA256 mismatch: '+name)
+            return len(files)
+    except (BadZipFile,KeyError,TypeError,ValueError,UnicodeDecodeError) as exc:
+        raise ValueError('frozen ZIP schema or member integrity invalid') from exc
+
+
 def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_archive=None):
     if not re.fullmatch('[a-f0-9]{64}',frozen_sha):
         raise ValueError('must supply exact frozen-rule archive SHA256')
@@ -64,10 +103,9 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_a
     if (repo/'.github').exists() and (root==repo or repo in root.parents):
         raise ValueError('private raw capture cannot be stored inside public repository')
     archive_verified=False
+    verified_members=0
     if frozen_archive is not None:
-        archive=Path(frozen_archive)
-        if not archive.is_file() or sha256(archive.read_bytes()).hexdigest()!=frozen_sha:
-            raise ValueError('frozen archive bytes do not match pinned hash')
+        verified_members=verify_frozen_archive(frozen_archive,frozen_sha)
         archive_verified=True
     sources={}
     for kind,url in source_urls(session).items():
@@ -90,6 +128,7 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_a
         'turnover_ntd':sources['turnover'][2]['turnover'],
         'frozen_rule_archive_sha256':frozen_sha,
         'frozen_rule_archive_bytes_verified':archive_verified,
+        'frozen_rule_members_verified':verified_members,
         'calendar_verified_independently':False,
         'publication_timestamp_verified':False,
         'signal_frozen_before_outcome':False,
