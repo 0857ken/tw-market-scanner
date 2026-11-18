@@ -63,7 +63,13 @@ opens if the two official reports are already available:
     python3 research/rebound_history/forward_capture.py PRIVATE_DIRECTORY YYYY-MM-DD NEXT_SESSION_YYYY-MM-DD PINNED_FROZEN_RULE_ARCHIVE_SHA256
 
 The operator must confirm NEXT_SESSION independently (weekend/holiday
-arithmetic is insufficient). The capture checks the session-specific OHLC and
+arithmetic is insufficient).
+Optional: add --frozen-archive APPROVED_PRIVATE_ARCHIVE.zip to the capture
+command. Without this argument, a 64-digit hash is only an unverified reference
+and frozen-rule evidence remains false. With the option, the actual private
+archive bytes must match the supplied SHA256 before any official fetch occurs.
+Even byte-level matching is not proof of the external timestamp of the freeze.
+ The capture checks the session-specific OHLC and
 turnover response, enforces exact two-source closing-price agreement, and
 writes both source bodies, receipts, and their SHA256 to a new unique folder
 outside this Git checkout. No paid endpoint, schedule, Secrets, Release, state
