@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from hashlib import sha256
+from zipfile import ZipFile
 from pathlib import Path
 from forward_capture import collect, source_urls
 
@@ -43,15 +44,49 @@ class ProspectiveCaptureTests(unittest.TestCase):
     def test_frozen_rule_bytes_checked_before_capture(self):
         with tempfile.TemporaryDirectory() as temp:
             archive=Path(temp)/'frozen.zip'
-            archive.write_bytes(b'approved-archive-fixture')
+            member=b'# original frozen signal code fixture'
+            with ZipFile(archive,'w') as z:
+                z.writestr('tools/backtest.py',member)
+                z.writestr('data/r25_frozen_rules.json',json.dumps({
+                    'basis_as_of':'2026-10-16',
+                    'signal_keys':['signal_'+str(i) for i in range(15)],
+                    'files_sha256':{'tools/backtest.py':sha256(member).hexdigest()},
+                }))
             digest=sha256(archive.read_bytes()).hexdigest()
             path,report=collect(temp,'2026-11-18','2026-11-19',digest,
                                 self.fake(),frozen_archive=archive)
             self.assertTrue(report['frozen_rule_archive_bytes_verified'])
+            self.assertEqual(report['frozen_rule_members_verified'],1)
             self.assertFalse(report['pit_qualified'])
             with self.assertRaises(ValueError):
                 collect(temp,'2026-11-18','2026-11-19','a'*64,
                         self.fake(),frozen_archive=archive)
+
+    def test_reject_manifest_member_tampering_even_if_outer_sha_matches(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive=Path(temp)/'tampered.zip'
+            with ZipFile(archive,'w') as z:
+                z.writestr('tools/backtest.py',b'TAMPERED')
+                z.writestr('data/r25_frozen_rules.json',json.dumps({
+                    'basis_as_of':'2026-10-16',
+                    'signal_keys':['signal_'+str(i) for i in range(15)],
+                    'files_sha256':{'tools/backtest.py':sha256(b'ORIGINAL').hexdigest()},
+                }))
+            outer_sha=sha256(archive.read_bytes()).hexdigest()
+            with self.assertRaises(ValueError):
+                collect(temp,'2026-11-18','2026-11-19',outer_sha,
+                        self.fake(),frozen_archive=archive)
+            self.assertEqual(list(Path(temp).rglob('status.json')),[])
+
+    def test_reject_non_zip_even_with_matching_outer_digest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            archive=Path(temp)/'not-a-zip'
+            archive.write_bytes(b'arbitrary contents')
+            digest=sha256(archive.read_bytes()).hexdigest()
+            with self.assertRaises(ValueError):
+                collect(temp,'2026-11-18','2026-11-19',digest,
+                        self.fake(),frozen_archive=archive)
+            self.assertEqual(list(Path(temp).rglob('status.json')),[])
 
     def test_invalid_date_and_sha_rejected(self):
         with self.assertRaises(ValueError):
