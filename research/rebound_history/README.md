@@ -37,3 +37,43 @@ fills, fees, slippage and true out-of-sample predictive ability have not been
 independently validated. The module always writes `pit_qualified_n = 0` and
 `EXPLORATORY_INDEX_PROXY_NOT_PIT`, never an approved strategy label. No new
 permissions, automatic capture, schedule or website publication are involved.
+
+
+## Forward PIT observation procedure (manual and private)
+
+The five-year historical capture is NOT a PIT dataset. Collection receipts
+were generated retrospectively in October/November 2026, not on the original
+2021–2026 signal dates. A valid HTTP Date header or SHA256 confirms a retrieved
+version, not the first time the underlying value was publicly available.
+
+First, audit the PINNED, authorized private research ZIP using:
+
+    python3 research/rebound_history/pit_guard.py PRIVATE_REVIEW.zip --sha256 APPROVED_PRIVATE_ZIP_SHA256 --out PRIVATE_PIT_AUDIT.json
+
+The offline tool checks each raw body SHA256, source host, retrieval timestamps,
+year/month/day scope and the historical next observed session. Its statuses
+never claim PIT qualification. Missing start times/redirect identities in old
+receipts are explicitly quarantined. The audit output must remain outside the
+public Git repository.
+
+For a genuinely future TWSE session, use the following once-only, private
+manual data capture, after that session closes and before the next session
+opens if the two official reports are already available:
+
+    python3 research/rebound_history/forward_capture.py PRIVATE_DIRECTORY YYYY-MM-DD NEXT_SESSION_YYYY-MM-DD PINNED_FROZEN_RULE_ARCHIVE_SHA256
+
+The operator must confirm NEXT_SESSION independently (weekend/holiday
+arithmetic is insufficient). The capture checks the session-specific OHLC and
+turnover response, enforces exact two-source closing-price agreement, and
+writes both source bodies, receipts, and their SHA256 to a new unique folder
+outside this Git checkout. No paid endpoint, schedule, Secrets, Release, state
+or publication workflow is used. No historical day is backdated.
+
+A new receipt qualifies at most as evidence of retrieval before the next
+opening. The script deliberately NEVER sets PIT-qualified to true, cannot
+generate trading advice, and does not claim market index prices are directly
+tradable. Independent durable timestamp anchoring, proven original source
+publication/version timing, verified exchange calendar, a pre-outcome frozen
+signal decision, genuinely future matured outcomes and an executable
+instrument/cost model all require separate review. Until then both historical
+PIT and true out-of-sample strategy validity remain BLOCKED.
