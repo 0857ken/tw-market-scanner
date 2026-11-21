@@ -19,7 +19,7 @@ from zipfile import ZipFile, BadZipFile
 from pit_guard import TZ, FROZEN_END, prospective_gate, verify_receipt
 from capture_seal import write_local_seal, verify_local_seal
 from series import price_month
-from evidence_schema import iso_date, twse_urls, unique_json
+from evidence_schema import iso_date, twse_urls, unique_json, verify_source_endpoints
 
 MAX_BYTES=8_000_000
 
@@ -111,8 +111,9 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_a
     for kind,url in source_urls(session).items():
         body,receipt=fetcher(url)
         started,finished,legacy=verify_receipt(receipt,body)
-        if legacy or receipt['url']!=url or receipt['effective_url']!=url:
+        if legacy or receipt['url'] != url:
             raise ValueError('source receipt is incomplete or mismatched')
+        verify_source_endpoints(session, kind, receipt['url'], receipt.get('effective_url'))
         if started.astimezone(TZ).date() < day:
             raise ValueError('receipt starts before the requested market date')
         rows=price_month(body,session[:7],kind)
