@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "scope": "Stage 4C-1 continuation: documentation and non-production evidence only",
+  "verifiedAt": "2026-10-20T16:11:40.625658+08:00",
+  "productCodeCommit": "b64eb7dd4aca690b41059ad7d13eca256c7b09a8",
+  "python": {
+    "pythonTests": 116,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "node": {
+    "tests": 80,
+    "failures": 0,
+    "skips": 0
+  },
+  "offlineMatrix": {
+    "registeredCases": 45,
+    "allRegisteredPass": true,
+    "scope": "offline fixtures; not official new-day/live/remote acceptance",
+    "registrationDoesNotCloseKnownP1Gaps": true
+  },
+  "buildsAndAudits": {
+    "general": true,
+    "fixedRC": true,
+    "dailySeed": true,
+    "workflowAudit": true
+  },
+  "localChromium": {
+    "status": "NOT_RUN",
+    "reason": "Official Playwright browser download failed; no trusted system Chromium found",
+    "remoteCIRequired": true
+  },
+  "dryRun": {
+    "packaged": true,
+    "allHashesVerified": true,
+    "fixedFrontendReused": true,
+    "restoreByteIdentical": true,
+    "atomicCASLedgerAndPreviousBundle": true,
+    "productionDeployed": false,
+    "strategyComplete": false,
+    "fixtureAsOf": "2026-10-13"
+  },
+  "receipt": {
+    "zipSha256": "72d1629a6404225865588824c4a22b21aa8effedcf25b5505317fc091a85dad7",
+    "manifestSha256": "5bd0b56064a8fbb57c6eac7469eed443c98e141a18f470dc3628368d63682ffb",
+    "dataSha256": "e5a8f6fc730814387e2b36db61ca9f92fce53403782b228f070b05af8ad35064",
+    "version": "eod-2026-10-13-acf9940043e3",
+    "runId": "ci-fixture-local",
+    "frontendPinSha256": "1f24f4de9e88d4c3a6174151526e6a1eb9096a17f397f22613d884d932797dda",
+    "deploymentAuthorized": false
+  },
+  "preflight": {
+    "exitCode": 2,
+    "acquisitionCalls": 0,
+    "failure": {
+      "baselineVerified": false,
+      "error": "HTTP Error 404: Not Found",
+      "fallbackUsed": false,
+      "productionUnchanged": true,
+      "runAttempt": 1,
+      "runId": "manual-preflight-20261020"
+    }
+  },
+  "officialDiagnostic": {
+    "evidence": "STAGE4C1_SOURCE_PROBE_20261020.json",
+    "status": "source-diagnostic-completed",
+    "sourceInvocations": 6,
+    "marketDates": {
+      "TWSE": "2026-10-20",
+      "TPEx": "2026-10-20",
+      "TPExInstitutional": "2026-10-20"
+    },
+    "baselineUnchanged": true,
+    "candidateCreated": false,
+    "before1630Boundary": true
+  },
+  "fullLatestDayCandidateAcceptance": "BLOCKED: no remote successfulPointer/Release baseline; source diagnostic is not a candidate",
+  "completeStrategyCheck": {
+    "passed": false,
+    "expectedRejection": "Independent market calendars not verified"
+  },
+  "protectedFileSha256": {
+    "pipeline/release_check.py": "19f126c1484ed4fbac625b9b87d54f57c00b7414a73a12b44ddb5edf5ca46e58",
+    "pipeline/observation_release.py": "39afb15d82b4dfbfca6ccac6a31cd433948e629db35b5dad74ac23de45ad530a",
+    "pipeline/research.py": "d7b87242fe24642b42eb1bd0b06b97b12cba7f80f1f85e0cbdbf7578e729070c",
+    "pipeline/parsers.py": "1a685e0ea3260a4c6bc6500625b8c1e1b24974df7804453b07906471769e8d0c",
+    "pipeline/schema.py": "3d78b40639859181c420f09ff910bd13114c77604b8ea907bc7833312e853792",
+    "frontend/src/logic.js": "aff5873fd5366dfc918e53161832b0646aa214ae00d14e2a9734acc1a50c88b6",
+    "frontend/src/research.js": "3429916a836e1d15ca5fe6782555ba4c16cf04c1530ae786b68d484975787de9",
+    "config/credit-rule.json": "42ea13d3d8df0e57f89ff70bf8a41ced7d3a3ffab0af4364c5c1471f337eff57",
+    "config/source-publication.json": "a57424c99eca5ea173cdbe61903881ce10976324dc15753777cf943d2f7043d6",
+    "config/research-approvals.json": "eee1716c785eacf8f533e9ad0997c5c6040f9e7f85e9d70f3590d04327c86419",
+    "config/daily-release.json": "4133b832971bb4995e0675ef3c709ee01b3e9ff75261c989ce26c0c14906a70b",
+    "config/observation-release.json": "6731fe45ea9d2c122b27a156d61d298dd428ce209831646950d557b932b4e25a",
+    ".github/workflows/pages-release.yml": "07ec8e9cebcc239d92232663d52bb9f0f872cfa6a4b64b602d4fb317ae00a7ed",
+    ".github/workflows/ci.yml": "1bc51b8b2dd1bcc3a115b972f3f67163c2a5f0459b92aa9d105475a2fe760657",
+    ".github/workflows/package-daily.yml": "bbc6937e29a1dd40d62d43f3eea5b8cdc6efb35ce6c0b8eb4e0dad4a51e214b9",
+    ".github/workflows/deploy.yml": "b7a7789dd4de9e53958b210c62c4b987a2401eac0c43aba0111d46868d4fd098",
+    ".github/workflows/update-data.yml": "d6e35a34a95030caea53c7fcbf63a9413cab981ef35edfa55a4cd91ba0375f6a"
+  },
+  "logs": {
+    "python": {
+      "sha256": "d24cab651b2bccefb378cbad44558a6dac122bb6ef3aa76a3c3c1ce5abe71734",
+      "bytes": 23440
+    },
+    "node": {
+      "sha256": "14e0f3cdbd477c5f1bd6e0d58f6ae8b6c19b5fa0443145de5b9e62dae543e488",
+      "bytes": 6479
+    },
+    "build": {
+      "sha256": "ebed254a58aae282a815f8ae4743389ca0cf2b4636d8423eda2d92f5de089946",
+      "bytes": 1198
+    },
+    "rc-build": {
+      "sha256": "9cf9b2f06c8ddea010818bd36871bc2953bade89dec709f8de4239b84cabf648",
+      "bytes": 3163
+    },
+    "daily-build": {
+      "sha256": "c8f5415c04be412cfe55dc3a2450433debda712d59b298ca6a239ea64bdb1775",
+      "bytes": 488
+    },
+    "dry-run": {
+      "sha256": "483d1ad210420df34dcc63addef187e6f89d33722b4681aecde727cea63fbb1d",
+      "bytes": 441
+    },
+    "browser-install": {
+      "sha256": "cbb02cfad8b8f247306f60f5fe481bd2774cc0121b1b8ca9a1a59377ce135f9f",
+      "bytes": 5334
+    },
+    "source-probe": {
+      "sha256": "b9f489529d29d3a0a765fb865e28e0abdf2fe5fb920a86e5298c40ef2dd48229",
+      "bytes": 683
+    }
+  },
+  "repositoryProductFilesChanged": false,
+  "productionDeployed": false,
+  "scheduleEnabled": false,
+  "mainMerged": false,
+  "realRemotePublicationMutations": 0,
+  "remoteCIEvidence": "See exact continuation HEAD checks and run IDs in existing PR #2; this record describes local verification of unchanged product code."
+}

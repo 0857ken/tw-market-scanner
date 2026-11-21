@@ -1,53 +1,49 @@
 # 開發、維運與發布
 
-## 本機與分支
+更新：2026-10-20。Repository：0857ken/tw-market-scanner。正式站：https://0857ken.github.io/tw-market-scanner/ 。
 
-分支 `feature/scanner-v3-real-data`，main 保留原始 handoff。尚無 remote、公開 repo、PR、正式 Pages URL。壓縮包有兩分支的 Git bundle，可還原：
+## 目前狀態
+
+正式觀察版 `4b1-rc1` 已於 Stage 4B-2 發布，Pages Run 38496725153；正式 TWSE／TPEx 行情日仍為 2026-10-13。不要重新建庫、首次上線或假設 main 仍是原始 handoff。
+
+開發沿用 `feature/stage4c1-daily-update` 與 Draft PR #2，4C-1B 候選架構與 4C-2B 離線協調已有成果，尚未合併 main。4C-2C 已有 state 專用保護；原始 Release、state 分支、g0／successfulPointer 與乾淨遠端還原尚未完成。沒有啟用每日 schedule。
+
+[本輪驗收](STAGE4C1_REVALIDATION_20261020.md) · [每日維運、架構與回復](STAGE4C1_OPERATIONS.md) · [4C-2B 離線實作](STAGE4C2B_IMPLEMENTATION.md) · [4C-2A 規格](STAGE4C2A_ARCHITECTURE_AND_CODEX_SPEC.md)。
+
+## 本機驗證
+
+Python 3.12+、Node 22+。只使用既有 requirements／lockfile：
 
 ```bash
-git clone scanner-development.bundle scanner-repo
-cd scanner-repo
-git switch feature/scanner-v3-real-data
 npm run setup
 npm test
 npm run build
+node scripts/audit-built.mjs
 npm run preview
 ```
 
-也可直接進入壓縮包的 source 目錄執行 npm 命令。preview 目錄為已建置靜態檔案，須用 HTTP 開啟，不能以 file:// 驗收。Python 需要 zoneinfo 的台灣／美國時區資料。
+在 `http://127.0.0.1:4173/tw-market-scanner/` 驗收。測試使用離線 fixture，不抓金融 API。三組瀏覽器測試及完整候選 dry-run 見每日維運說明；Chromium 不能代替 iPhone Safari。
 
-## 資料與錯誤
+## 官方更新入口
 
-`python3 -m pipeline.run` 取得官方來源，解析成功才存快照，各模組獨立記錄 asOf、fetchedAt、lastAttemptAt、結果、SHA256、筆數。缺值 null；T86 pending 時不發 HTTP、不讀舊明細。
+```bash
+npm run data:candidate -- --help
+```
 
-- HTTP／解析失敗：保留前次成功觀察及日期，source error。
-- HTTP 成功但日期落後：保留真值，source stale，不能改今天。
-- 無歷史：error／unavailable，不切 DEMO。
-- 未知年度日曆：unknown，不猜假日。
-- 整體合約／信用匯入失敗：保留前次驗證的行情值與日期，發布明確 error 品質狀態，程式非 0；不讓新壞資料蓋掉舊觀察。
+此命令對應 `pipeline.verified_baseline`。必填精確成功 ZIP／generation、原定 target／slot／deadline、run／attempt 與全新 output。缺 state／來源閉包／live 對應即停止。舊 run／daily CLI 與 daily_release 直接抓取都不是替代入口；不要設 `DATA_UPDATES_APPROVED=true` 或用 checkout／market-data 冒充正式 baseline。
 
-strict 在無真實行情或價量／公司不新鮮時非 0，本次落後為結束碼 2。一般模式保留部分可用的有日期資料。台灣收盤後 16:30 起期待當日；之前期待前交易日；週末／官方假期跳過。前端按現在台灣時間重新判斷落後。
+另准的低負載來源診斷只保存必要 metadata，不賦予候選或發布資格。403／429／來源異常停止，不換來源、Token 或日期參數繞過。
 
-日快照持續累積，整合最多讀最近 300 個模組快照；缺應有交易日插入 null，不壓縮或延用前價。MA20／60／120 需 N 日有效收盤；N 日突破需 N+1 日。股與法人畫面除 1,000 成張；TX 是口。未還原價格不得做含息回測或宣稱原站績效。
+## 發布與回復
 
-## 遠端啟用（尚未執行）
+正式站目前使用原完整 ZIP；每日前端尚待 seed 核准。未來流程：成功 pointer → 封存閉包／live → 隔離採集／gate → 固定 seed 打包／receipt → 不可變封存與單一預約 → 一次 Pages create → API 與兩輪全檔 HTTPS → 成功 CAS。
 
-先取得使用者對公開建立 `0857ken/tw-market-scanner` 的同意，確認無 Secret、憑證、聯絡個資及未授權明細，才新建 repo、推送 main baseline 與 feature、開 PR。不可操作 txf-tracker。本次 PR 文字是草稿，不能當作已開。
+舊 `pages-release.yml` 尚未接入單一協調器，main 也尚有舊人工更新入口；實際 variable 值未核實。這些是正式 daily writer 開放前的阻擋，不能依舊說明重跑首次發布。
 
-CI 僅精確 repo 名稱＋公開 repo，執行測試、build、子路徑 E2E。遠端 runner 尚未驗證，成功後再合併。
+正式回復須有該操作的精確授權，使用原完整舊 ZIP、其 seed／receipt／來源閉包，經同協調器產生新 generation 並重驗 live。不重新 build、不只換 pointer。逾時、失聯、UNKNOWN、混版或網站已換但 pointer 未記，停止並唯讀 reconcile，不自動重送或回復。
 
-公開建庫及開發 PR 完成審核後，在此 repo 設非機密 variable `DATA_UPDATES_APPROVED=true`。從 main 執行更新 workflow，驗收 market-data 分支與 quality.json。流程先載入 market-data 舊歷史並合併 main 程式，再取新資料，避免每日重置。只提交 data/；來源 stale／error 仍可保存品質狀態，之後 job 明確失敗，不部署。資料分支保護若阻擋推送，只調整本新 repo，不拿另一專案 Token 繞過。
+## 費用與限制
 
-## 正式網站（另需同意）
+額外月費目標 NT$0；只用公開 repo 的標準 Ubuntu runner，不新增付費來源／雲端／larger runner。artifact 僅供短期診斷，正式備份須保留必要完整舊版與閉包。啟用前核對帳號共享儲存與預算，不自動加購、GC 歷史或縮減必要來源。
 
-公開建庫同意、來源權利、遠端 CI、資料更新與人工驗收完成後，再請使用者核准網站上線。核准後選 Pages Source=GitHub Actions、設定 `PAGES_RELEASE_APPROVED=true`，從 main 人工 dispatch。
-
-發布 overlay market-data 後，用現在台灣交易日重新檢查價量／公司新鮮度與實際使用模組的公開來源政策，才測試及 build。舊 quality.json 的成功值不能單獨通行。未接入／暖機可明示保留；帶未核實授權明細則阻擋。
-
-正式 `VITE_MARKET_URL` 指向獨立 market-data 的 raw JSON，每日品質更新不用重發布；讀取 cache:no-store。子路徑已本機驗證，但 GitHub CORS／CDN、權限、排程、URL 尚未實驗。發布成功後才提供實際可開啟網址，不把預定網址當上線。
-
-## 0 元與回復
-
-只允許公開 repo 的標準 ubuntu-latest，無付費 runner／API、信用卡、券商或交易。移除 DATA_UPDATES_APPROVED 停排程；移除 PAGES_RELEASE_APPROVED 停下次發布，不會自動刪除已有網站。已發布站點要下線需另操作 Pages。
-
-回復用已驗證 commit／PR。資料可由 market-data 來源快照重建，保留原日期與 error；不可補隨機值、填 0、改行情日期或抄回測數字。
+不得修改 txf-tracker、寄出詢問信、建立 PAT／Secrets、批量回補 300 日或解鎖信用／TWSE T86／未驗證長期訊號。完整策略 `release_check` 保持嚴格；observation-only 不代表完整策略通過。

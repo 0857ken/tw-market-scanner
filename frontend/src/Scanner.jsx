@@ -11,7 +11,7 @@ import { LayoutDashboard, Activity, Compass, TrendingUp, Menu, X, Search, Databa
   Zap, CircleHelp
 } from 'lucide-react';
 import { makeDemo, makeUnavailable, validateMarket, fetchMarket, effectiveStatus } from './data.js';
-import {observationSignals,fetchApprovedMarket} from './observation.js';
+import {observationSignals,fetchApprovedMarket,fetchDailyMarket} from './observation.js';
 const OBSERVATION_ONLY = import.meta.env.VITE_RELEASE_PROFILE === 'observation-only';
 import { CREDIT, COLORS, numeric, format, signed, avg, stockMetrics, getSignals, detectRegime, rollingVol,
   institutionalStreak, creditLight, lastMA, round } from './logic.js';
@@ -433,7 +433,7 @@ export default function Scanner(){
     const autoUrl = OBSERVATION_ONLY?`${import.meta.env.BASE_URL}market.json`:specified || `${import.meta.env.BASE_URL}market.json`;
     let active = true;
     setLoading(true);
-    (OBSERVATION_ONLY?fetchApprovedMarket(autoUrl,import.meta.env.VITE_APPROVED_DATA_SHA256,validateMarket):fetchMarket(autoUrl)).then(next => { if(active) { setMarket(next); setError('');setSelected(null); } }).catch(e => {
+    (OBSERVATION_ONLY?(import.meta.env.VITE_DAILY_FRONTEND_ID?fetchDailyMarket(autoUrl,import.meta.env.VITE_DAILY_FRONTEND_ID,validateMarket):fetchApprovedMarket(autoUrl,import.meta.env.VITE_APPROVED_DATA_SHA256,validateMarket)):fetchMarket(autoUrl)).then(next => { if(active) { setMarket(next); setError('');setSelected(null); } }).catch(e => {
       if (active) setError(`行情載入失敗：${e.message}。若已有快照，保留其原始日期；不以模擬資料替代。`);
     }).finally(()=>{if(active)setLoading(false)});
     return () => { active = false; };
@@ -514,9 +514,9 @@ export default function Scanner(){
         {page==='總覽'&&<div className="health-strip"><button onClick={()=>newPage('資料健康')}>價量 {STATUS_NAMES[quoteStatus]}</button><span>觀測 {selectedExchanges.map(m=>`${m} ${marketMeta(market,m).sessions?.length||0} 日`).join('／')}</span><span>{market.mode==='demo'?'DEMO 觀察池':`${MARKET_NAMES[scope]} ${signals.latest.length} 檔`}</span><span>{market.calendar?.state==='closed'?'官方日曆：休市':market.calendar?.state==='open'?'官方日曆：交易日':'日曆待核對'}</span></div>}
         {error && !sourceOpen && <div className="errorbox global-error"><AlertTriangle size={16}/>{error}<button onClick={() => OBSERVATION_ONLY?newPage('資料健康'):setSourceOpen(true)}>檢查資料來源</button></div>}
         {OBSERVATION_ONLY&&<section className="panel rc-version" aria-label="固定發布版本">
-          <p>observation-only · {import.meta.env.VITE_RC_VERSION} 固定版本 · {import.meta.env.VITE_RC_COMMIT?.slice(0,12)}</p>
+          <p>observation-only · {import.meta.env.VITE_DAILY_FRONTEND_ID?(market.observationProfile?.version||'待驗證'):import.meta.env.VITE_RC_VERSION} 固定前端 · {import.meta.env.VITE_RC_COMMIT?.slice(0,12)}</p>
           <p>核准行情日 {market.asOf||'尚未載入'} · 距今 {market.asOf?Math.max(0,Math.floor((Date.parse(new Date(clock).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}))-Date.parse(market.asOf))/86400000)):'—'} 個日曆日（不是交易日）· 不保證最新。</p>
-          <p>資料 SHA256 {import.meta.env.VITE_APPROVED_DATA_SHA256?.slice(0,16)}… · 日曆僅部分資料；最新交易日未完整驗證。</p>
+          <p>資料 SHA256 {(market.releaseIntegrity?.dataSha256||import.meta.env.VITE_APPROVED_DATA_SHA256)?.slice(0,16)}… · {market.releaseIntegrity?.runId&&`Run ${market.releaseIntegrity.runId} · `}日曆僅部分資料；最新交易日未完整驗證。</p>
           <a href={`${import.meta.env.BASE_URL}release-manifest.json`} target="_blank" rel="noreferrer">完整 SHA、資料版本與資源清單</a>
         </section>}
         <section className="coverage-panel" aria-label="研究母體與資料覆蓋">

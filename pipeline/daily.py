@@ -1,6 +1,6 @@
-"""One explicit current-data update, staged and validated before promotion. No schedule.
+"""Internal acquisition into a NEW disposable candidate. Baseline is read-only.
 
-python -m pipeline.daily --data-dir <isolated copy of data>
+Use python -m pipeline.daily_release for the supported candidate entry point.
 Only six licensed current endpoints; no date parameters, T86, historical or paid API.
 """
 import argparse
@@ -16,6 +16,8 @@ from .run import collect, build
 from .research import integrate, member_on, suspended_on
 from .schema import validate, valid_number
 from .current_csv import fetch_twse_csv
+from .candidate_io import candidate_destination, exclusive_lock, publish_directory, atomic_json
+from .daily_policy import load as load_policy
 
 MODULES = ('calendar', 'companies', 'quotes', 'tpexCompanies', 'tpexQuotes', 'tpexInstitutional')
 PARSERS = {'calendar': lambda raw: (max(r['date'] for r in calendar_rows(raw)), calendar_rows(raw)),
@@ -61,27 +63,36 @@ def quality(payload):
     return result
 
 
-def run_daily(data_dir, now=None, twse_current_csv=False):
+def run_daily(data_dir, now=None, twse_current_csv=False, stop_on_failure=False, *, output_dir=None):
+    load_policy()
+    if output_dir is None:
+        raise ValueError('Read-only baseline: output_dir is required; use pipeline.daily_release')
     data_dir = Path(data_dir).resolve()
+    output = candidate_destination(data_dir, output_dir)
     now = now or datetime.now(TPE)
     original = read_json(data_dir/'market.json')
     if not original: raise ValueError('A validated baseline data copy is required')
     validate(original)
     attempt = {'attemptedAt': now.astimezone(TPE).isoformat(timespec='seconds'), 'modules': list(MODULES),
                'historicalRequests': 0, 'scheduleEnabled': False}
-    # No untrusted candidate is written over published data. A failed attempt leaves market,
-    # raw snapshots and source-state byte-identical; only an explicit attempt report is added.
-    with tempfile.TemporaryDirectory(prefix='scanner-daily-') as tmp:
+    # All multi-file writes stay in an unpublished generation. No rollback writes
+    # to the input are necessary, even when a write is interrupted mid-file.
+    with exclusive_lock(output.parent / ('.' + output.name + '.lock')), tempfile.TemporaryDirectory(prefix='.daily-', dir=output.parent) as tmp:
+        candidate_destination(data_dir, output)  # Recheck after acquiring the lock, before HTTP.
         stage = Path(tmp)/'data'
         shutil.copytree(data_dir, stage)
         sources = copy.deepcopy(read_json(stage/'source-state.json', {}).get('sources', {}))
         sources.pop('pipeline', None)
-        for module in MODULES:
-            collect(stage, sources, module, PARSERS[module], now,
-                    fetcher=fetch_twse_csv if module == 'quotes' and twse_current_csv else None)
-        attempt['sources'] = {m:sources.get(m) for m in MODULES}
-        errors = [m for m in MODULES if sources.get(m, {}).get('fetchStatus') != 'ok']
         try:
+            attempt['attemptedModules'] = []
+            for module in MODULES:
+                attempt['attemptedModules'].append(module)
+                collect(stage, sources, module, PARSERS[module], now,
+                        fetcher=fetch_twse_csv if module == 'quotes' and twse_current_csv else None)
+                if stop_on_failure and sources.get(module, {}).get('fetchStatus') != 'ok':
+                    break
+            attempt['sources'] = {m:sources.get(m) for m in MODULES}
+            errors = [m for m in MODULES if sources.get(m, {}).get('fetchStatus') != 'ok']
             if errors: raise ValueError('Update aborted; failed sources: '+', '.join(errors))
             calendar = read_json(sorted((stage/'raw').glob('calendar_*.json'))[-1])['rows']
             payload = integrate(build(stage, sources, calendar, original['creditHistory'], now), stage)
@@ -92,27 +103,18 @@ def run_daily(data_dir, now=None, twse_current_csv=False):
                       'warnings': ['TPEx完整交易日曆未獨立核准，更新成功不代表日期已驗證', '信用策略凍結；TWSE T86停用', '還原價格及完整歷史未驗證']}
             expected, known = expected_session(now, calendar)
             attempt.update(status='validated', expectedTWSE=expected if known else None, coverage=report['coverage'])
-            # Snapshots are immutable per source/date. Promote only new, validated snapshots;
-            # market.json is the final atomic reader-visible commit marker.
-            for path in (stage/'raw').glob('*.json'):
-                destination = data_dir/'raw'/path.name
-                if not destination.exists():
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(path, destination)
-            write_json(data_dir/'source-state.json', {'sources': payload['sources']})
-            write_json(data_dir/'quality.json', report)
-            write_json(data_dir/'market.json', payload)
+            write_json(stage/'source-state.json', {'sources': payload['sources']})
+            write_json(stage/'quality.json', report)
+            write_json(stage/'market.json', payload)
+            write_json(stage/'daily-attempt.json', attempt)
+            publish_directory(stage, output)
         except Exception as exc:
+            attempt['sources'] = {m:sources.get(m) for m in MODULES}
             attempt.update(status='failed-last-valid-retained', error=str(exc), coverage=quality(original))
-            write_json(data_dir/'daily-attempt.json', attempt)
+            atomic_json(output.with_name(output.name + '.attempt.json'), attempt)
             return 2
-    write_json(data_dir/'daily-attempt.json', attempt)
     return 0
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--data-dir', type=Path, required=True)
-    parser.add_argument('--twse-current-csv', action='store_true', help='Use dataset 11549 current CSV instead of lagging OpenAPI; no historical date parameters')
-    args = parser.parse_args()
-    raise SystemExit(run_daily(args.data_dir, twse_current_csv=args.twse_current_csv))
+    raise SystemExit('Internal acquisition only. Use python -m pipeline.daily_release --help; no request made.')
