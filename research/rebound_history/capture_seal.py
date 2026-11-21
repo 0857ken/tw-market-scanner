@@ -11,7 +11,7 @@ from pathlib import Path
 
 from pit_guard import TZ, as_utc, prospective_gate, verify_receipt
 from series import price_month
-from evidence_schema import iso_date, twse_urls, unique_json
+from evidence_schema import iso_date, twse_urls, unique_json, verify_source_endpoints
 
 DATA_FILES = ('ohlc.body', 'ohlc.receipt.json',
               'turnover.body', 'turnover.receipt.json', 'status.json')
@@ -55,9 +55,7 @@ def _validate_contents(directory):
         started, finish, legacy = verify_receipt(receipt, raw)
         if legacy:
             raise ValueError('legacy receipt not permitted')
-        expected = twse_urls(session)[kind]
-        if receipt['url'] != expected or receipt.get('effective_url') != expected:
-            raise ValueError('receipt endpoint or query differs from capsule source')
+        verify_source_endpoints(session, kind, receipt['url'], receipt.get('effective_url'))
         if started.astimezone(TZ).date() < day:
             raise ValueError('receipt predates data session')
         completed.append(finish)
