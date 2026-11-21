@@ -123,8 +123,8 @@ The historical `queryYear` request could return the server's default year.
 Retain those original responses as excluded evidence. New calendar captures
 must pass the existing response-year check before use.
 
-Prospective source receipts must match the exact configured TWSE endpoint and
-month query, including the effective URL. Date identifiers must be canonical
+Prospective source receipts must match one of the exact reviewed TWSE endpoint
+formats for that observation session, including the effective URL. Date identifiers must be canonical
 YYYY-MM-DD. Ambiguous JSON with duplicate keys or non-finite constants is
 rejected. A local seal rejects flags that purport to certify an external time
 anchor, calendar authenticity, publication time or pre-outcome signal. Frozen
@@ -158,3 +158,29 @@ Local timestamps can be forged by a caller with control of the files or
 fetcher. Whole-directory deletion or coordinated rollback cannot be detected
 without an independently retained highest accepted record. This tool is not
 an external time service or immutable storage.
+
+
+## Reviewed TWSE route compatibility and 2026-11-20 provenance
+
+The original TWSE OHLC path `/indicesReport/MI_5MINS_HIST` remains
+recognized for `date=YYYYMM01`. Its reviewed official successor
+`/rwd/zh/TAIEX/MI_5MINS_HIST` permits `date=YYYYMMDD` matching the
+requested session or `date=YYYYMM01` for that same month. Turnover remains
+`/exchangeReport/FMTQIK?response=json&date=YYYYMM01`. The source URL
+and HTTP redirect target are checked **independently**, and both must use
+HTTPS, host `www.twse.com.tw` exactly, a reviewed path and exactly one
+`response=json` plus exactly one session-matching `date` parameter.
+Additional/duplicated query keys, unrelated same-host endpoints, host aliases,
+URL fragments, other months and invalid dates are rejected. Receipt bytes
+and the original requested/effective URLs are never rewritten during review.
+
+This compatibility change permits *integrity validation* of an already
+sealed 2026-11-20 one-signal observation whose OHLC request used the
+reviewed official RWD path. It does **not** certify its source publication
+time, external timestamp, calendar status or frozen rule identity. The
+observation's saved `frozen_rule_archive_sha256` differs from the
+recovered full 15-signal research rules ZIP, whose complete original
+bytes are pinned independently. `forward_review.build_decision` rejects
+that mismatch. The earlier single `day_drop3` observation must remain
+separate, `DESCRIPTIVE_ONLY`, and not be counted in the 15-predicate
+pre-registered OOS population. No historical PIT qualification changes.
