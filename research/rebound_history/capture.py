@@ -27,7 +27,7 @@ def jobs(series, dates=()):
         return
     for y in range(START.year, END.year + 1):
         if series == 'calendar':
-            yield series, str(y), [url(TWSE, '/rwd/zh/holidaySchedule/holidaySchedule', response='json', queryYear=y)]
+            yield series, str(y), [url(TWSE, '/holidaySchedule/holidaySchedule', response='json', date=f'{y}0101')]
         if series == 'futures':
             end = END if y == END.year else date(y,12,31)
             yield series, str(y), [url(TAIFEX, '/cht/3/futContractsDateDown', queryStartDate=f'{y}/01/01',

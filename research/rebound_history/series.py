@@ -9,6 +9,7 @@ import json
 import zipfile
 
 from capture import END, START, STUDY, jobs
+from evidence_schema import unique_json
 
 PRICE = ['日期','開盤指數','最高指數','最低指數','收盤指數']
 TURN = ['日期','成交股數','成交金額','成交筆數','發行量加權股價指數','漲跌點數']
@@ -42,7 +43,7 @@ def roc(value):
 
 
 def price_month(body, tag, kind):
-    obj = json.loads(body)
+    obj = unique_json(body)
     fields = PRICE if kind == 'ohlc' else TURN
     if obj.get('stat') != 'OK' or obj['date'][:6] != tag.replace('-', '') or obj['fields'] != fields:
         raise ValueError('wrong month, status or fields')
@@ -69,7 +70,7 @@ def price_month(body, tag, kind):
 
 
 def calendar_year(body, tag):
-    obj = json.loads(body)
+    obj = unique_json(body)
     year=int(tag)
     if obj.get('fields') != ['日期','名稱','說明'] or str(obj.get('queryYear')) not in (tag,str(year-1911)):
         raise ValueError('calendar response year or schema does not match request')
@@ -78,7 +79,8 @@ def calendar_year(body, tag):
         d=date.fromisoformat(iso)
         if d.year!=year or d in days:
             raise ValueError('calendar wrong year or duplicate')
-        if '開始交易' not in name and '最後交易' not in name:
+        settlement_only = f'{d.month}月{d.day}日市場無交易' in reason
+        if settlement_only or ('開始交易' not in name and '最後交易' not in name):
             days[d]=(name,reason)
     return days
 

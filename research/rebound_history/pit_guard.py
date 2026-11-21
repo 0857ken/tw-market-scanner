@@ -12,6 +12,8 @@ import json
 import re
 import zipfile
 
+from evidence_schema import iso_date, unique_json
+
 TZ = ZoneInfo('Asia/Taipei')
 HOSTS = {'www.twse.com.tw', 'www.taifex.com.tw'}
 SERIES = {'ohlc','turnover','margin','calendar','futures','futures_alternates','official_checks'}
@@ -19,6 +21,8 @@ FROZEN_END = date(2026,11,13)
 
 
 def as_utc(value):
+    if not isinstance(value, str) or not re.match(r'^\d{4}-\d{2}-\d{2}T', value):
+        raise ValueError('timestamp must have an ISO date and time')
     d = datetime.fromisoformat(value.replace('Z','+00:00'))
     if d.tzinfo is None or d.utcoffset() is None:
         raise ValueError('missing timestamp offset')
@@ -54,7 +58,7 @@ def next_session(observed_dates, day):
 def classify(series, tag, completion, dates):
     if series != 'margin':
         return 'NOT_SESSION_SCOPED'
-    next_day = next_session(dates, date.fromisoformat(tag))
+    next_day = next_session(dates, iso_date(tag))
     if next_day is None:
         return 'NEXT_SESSION_UNDOCUMENTED'
     limit = datetime.combine(next_day,time(9),tzinfo=TZ).astimezone(timezone.utc)
@@ -85,7 +89,7 @@ def audit_zip(path, pinned_sha):
             body_name = name[:-5]+'.body'
             if body_name not in names:
                 raise ValueError('raw body missing')
-            receipt = json.loads(archive.read(name))
+            receipt = unique_json(archive.read(name))
             started,done,legacy = verify_receipt(receipt,archive.read(body_name),allow_legacy=True)
             records.append({
                 'series':series,'tag':tag,
@@ -112,7 +116,7 @@ def audit_zip(path, pinned_sha):
 
 
 def prospective_gate(session,next_session_date,completed_utc,anchored,crosschecked,frozen):
-    s,n=date.fromisoformat(session),date.fromisoformat(next_session_date)
+    s,n=iso_date(session),iso_date(next_session_date)
     t=as_utc(completed_utc)
     if s<=FROZEN_END or n<=s or (n-s).days>15:
         raise ValueError('not an approved prospective date pair')

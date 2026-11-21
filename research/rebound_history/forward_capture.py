@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from secrets import token_hex
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 import json
 import re
@@ -16,22 +16,18 @@ import shutil
 from io import BytesIO
 from zipfile import ZipFile, BadZipFile
 
-from pit_guard import FROZEN_END, prospective_gate, verify_receipt
+from pit_guard import TZ, FROZEN_END, prospective_gate, verify_receipt
 from capture_seal import write_local_seal, verify_local_seal
 from series import price_month
+from evidence_schema import iso_date, twse_urls, unique_json
 
 MAX_BYTES=8_000_000
 
 
 def source_urls(session):
-    day=date.fromisoformat(session)
-    if day<=FROZEN_END:
+    if iso_date(session)<=FROZEN_END:
         raise ValueError('future capture must be after frozen historical period')
-    month=day.strftime('%Y%m01')
-    return {
-        'ohlc':'https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?'+urlencode({'response':'json','date':month}),
-        'turnover':'https://www.twse.com.tw/exchangeReport/FMTQIK?'+urlencode({'response':'json','date':month}),
-    }
+    return twse_urls(session)
 
 
 def fetch_official(url):
@@ -70,13 +66,15 @@ def verify_frozen_archive(path, approved_sha):
             names=z.namelist()
             if len(names)!=len(set(names)):
                 raise ValueError('duplicate frozen ZIP paths')
-            frozen=json.loads(z.read('data/r25_frozen_rules.json'))
+            frozen=unique_json(z.read('data/r25_frozen_rules.json'))
             files=frozen.get('files_sha256')
             if (not isinstance(files,dict) or not files or
                 'tools/backtest.py' not in files or
                 len(frozen.get('signal_keys',[]))!=15 or
+                len(set(frozen['signal_keys']))!=15 or
                 not isinstance(frozen.get('basis_as_of'),str)):
                 raise ValueError('incomplete frozen rules manifest')
+            iso_date(frozen['basis_as_of'])
             total=0
             for name,digest in files.items():
                 if (not isinstance(name,str) or name.startswith('/') or
@@ -96,8 +94,8 @@ def verify_frozen_archive(path, approved_sha):
 def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_archive=None):
     if not re.fullmatch('[a-f0-9]{64}',frozen_sha):
         raise ValueError('must supply exact frozen-rule archive SHA256')
-    day=date.fromisoformat(session)
-    next_day=date.fromisoformat(next_session)
+    day=iso_date(session)
+    next_day=iso_date(next_session)
     if day<=FROZEN_END or next_day<=day or (next_day-day).days>15:
         raise ValueError('invalid session or next-session date')
     repo=Path(__file__).resolve().parents[2]
@@ -112,9 +110,11 @@ def collect(root,session,next_session,frozen_sha,fetcher=fetch_official,frozen_a
     sources={}
     for kind,url in source_urls(session).items():
         body,receipt=fetcher(url)
-        _,finished,legacy=verify_receipt(receipt,body)
-        if legacy or receipt['url']!=url:
+        started,finished,legacy=verify_receipt(receipt,body)
+        if legacy or receipt['url']!=url or receipt['effective_url']!=url:
             raise ValueError('source receipt is incomplete or mismatched')
+        if started.astimezone(TZ).date() < day:
+            raise ValueError('receipt starts before the requested market date')
         rows=price_month(body,session[:7],kind)
         if day not in rows:
             raise ValueError('requested session absent from '+kind)

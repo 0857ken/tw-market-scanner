@@ -9,8 +9,9 @@ import re
 from hashlib import sha256
 from pathlib import Path
 
-from pit_guard import as_utc, prospective_gate, verify_receipt
+from pit_guard import TZ, as_utc, prospective_gate, verify_receipt
 from series import price_month
+from evidence_schema import iso_date, twse_urls, unique_json
 
 DATA_FILES = ('ohlc.body', 'ohlc.receipt.json',
               'turnover.body', 'turnover.receipt.json', 'status.json')
@@ -22,16 +23,7 @@ def digest(body):
     return sha256(body).hexdigest()
 
 
-def _unique_json(data):
-    def unique(pairs):
-        result = {}
-        for k, v in pairs:
-            if k in result:
-                raise ValueError('duplicate JSON field: ' + k)
-            result[k] = v
-        return result
-    return json.loads(data, object_pairs_hook=unique)
-
+_unique_json = unique_json
 
 def _read_artifact(directory, name):
     if name not in DATA_FILES and name != 'SEAL.json':
@@ -49,17 +41,27 @@ def _validate_contents(directory):
     session, nxt = status.get('session'), status.get('next_session')
     if not isinstance(session, str) or not isinstance(nxt, str):
         raise ValueError('session identifiers missing')
+    day, next_day = iso_date(session), iso_date(nxt)
+    for flag in ('prospective_candidate', 'independent_timestamp_anchor',
+                 'calendar_verified_independently', 'publication_timestamp_verified',
+                 'signal_frozen_before_outcome', 'outcome_matured'):
+        if status.get(flag) is not False:
+            raise ValueError('local capture cannot certify ' + flag)
     rows = {}
     completed = []
     for kind in ('ohlc', 'turnover'):
         raw = _read_artifact(directory, kind + '.body')
         receipt = _unique_json(_read_artifact(directory, kind + '.receipt.json'))
-        _, finish, legacy = verify_receipt(receipt, raw)
+        started, finish, legacy = verify_receipt(receipt, raw)
         if legacy:
             raise ValueError('legacy receipt not permitted')
+        expected = twse_urls(session)[kind]
+        if receipt['url'] != expected or receipt.get('effective_url') != expected:
+            raise ValueError('receipt endpoint or query differs from capsule source')
+        if started.astimezone(TZ).date() < day:
+            raise ValueError('receipt predates data session')
         completed.append(finish)
         parsed = price_month(raw, session[:7], kind)
-        day = __import__('datetime').date.fromisoformat(session)
         if day not in parsed:
             raise ValueError('missing session in ' + kind)
         rows[kind] = parsed[day]

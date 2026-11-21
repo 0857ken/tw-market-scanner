@@ -114,3 +114,47 @@ forecast**. A future human/independent audit must provide an external
 timestamp anchor and original source availability proof before considering
 any PIT candidate. No schedule, Secrets, public data or live deployment
 are created by this feature.
+
+
+## Evidence and decision review hardening
+
+Calendar capture now follows the official form's `date=YYYY0101` parameter.
+The historical `queryYear` request could return the server's default year.
+Retain those original responses as excluded evidence. New calendar captures
+must pass the existing response-year check before use.
+
+Prospective source receipts must match the exact configured TWSE endpoint and
+month query, including the effective URL. Date identifiers must be canonical
+YYYY-MM-DD. Ambiguous JSON with duplicate keys or non-finite constants is
+rejected. A local seal rejects flags that purport to certify an external time
+anchor, calendar authenticity, publication time or pre-outcome signal. Frozen
+archive verification also rejects duplicate signal identifiers and ambiguous
+manifest JSON.
+
+`forward_review.py` adds an offline review step that binds a separately pinned
+plan, full civil-date calendar, ordered capsule list and the original frozen
+archive. Generate a plan with `make_plan`, serialize it with `canonical`, and
+retain its digest separately before the first observation. The calendar must
+supply every civil date, a TRADING_SESSION/CLOSED classification and a source
+evidence digest per row. The checker establishes internal consistency only.
+Those references still need independent human source review.
+
+The decision CLI takes PLAN PLAN_SHA CALENDAR CALENDAR_SHA CAPSULE_LIST
+CAPSULE_LIST_SHA FROZEN_ARCHIVE DECISION_UTC NEW_PRIVATE_OUTPUT. All JSON inputs
+use `canonical` bytes. Every capsule-list entry supplies directory and a
+separately retained seal_sha256. It rejects a missing session, changed plan,
+wrong source month, incomplete capture at the decision cutoff, future market
+date and a decision made after the next session has opened. It uses only
+the session row from each pinned capture. It never merges later monthly
+response versions into earlier observations or silently loads retrospective
+warmup. Missing warmup and absent chip inputs stay unknown.
+
+The resulting private record stores 15 unchanged predicates, all seven fixed
+horizons, input pins and a decision timestamp. Exclusive output creation
+requires revisions to use new filenames. It contains no future outcomes.
+Source-publication proof, calendar authenticity, external registration time
+and genuine sample-out maturation remain separate review requirements.
+Local timestamps can be forged by a caller with control of the files or
+fetcher. Whole-directory deletion or coordinated rollback cannot be detected
+without an independently retained highest accepted record. This tool is not
+an external time service or immutable storage.
