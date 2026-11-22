@@ -122,6 +122,8 @@ def reconcile_t1(signal_zip, signal_sha256, outcome_capsule, outcome_seal_sha256
     if not _valid_pin(outcome_seal_sha256):
         raise ValueError('separate outcome seal pin is required')
     outcome = Path(outcome_capsule)
+    if not outcome.is_dir() or outcome.is_symlink():
+        raise ValueError('outcome capsule missing or not a directory')
     validated = verify_local_seal(outcome, outcome_seal_sha256)
     status = unique_json((outcome / 'status.json').read_bytes())
     if (status.get('session') != signal['next_session_claim'] or
