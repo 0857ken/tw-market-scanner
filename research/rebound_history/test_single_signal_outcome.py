@@ -125,7 +125,7 @@ class DayDropOutcomeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             a,p,o,s=fixture(t)
             future,gate=collect(Path(t)/'future','2026-11-24','2026-11-25',FROZEN,
-                                fetch(NEXT))
+                                fetch('2026-11-24'))
             with self.assertRaises(ValueError):
                 reconcile_t1(a,p,future,gate['local_seal_sha256'])
 
