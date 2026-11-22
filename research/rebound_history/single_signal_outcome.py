@@ -66,7 +66,7 @@ def read_signal_archive(archive, approved_sha256):
                 raise ValueError('event is not an unqualified day_drop3 observation')
             with tempfile.TemporaryDirectory() as temp:
                 folder = Path(temp)
-                for name in sorted(DATA_FILES | () if isinstance(DATA_FILES, set) else DATA_FILES):
+                for name in DATA_FILES:
                     (folder / name).write_bytes(z.read('capsule/' + name))
                 (folder / 'SEAL.json').write_bytes(z.read('capsule/SEAL.json'))
                 seal_check = verify_local_seal(folder, decision['capsule_seal_sha256'])
