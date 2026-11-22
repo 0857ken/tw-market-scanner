@@ -184,3 +184,44 @@ bytes are pinned independently. `forward_review.build_decision` rejects
 that mismatch. The earlier single `day_drop3` observation must remain
 separate, `DESCRIPTIVE_ONLY`, and not be counted in the 15-predicate
 pre-registered OOS population. No historical PIT qualification changes.
+
+
+## Separate day_drop3 T+1 observation after an actual next session
+
+Manual-only command `single_signal_outcome.py` reconciles the separately
+sealed 2026-11-20 one-signal event ZIP with an independently pinned
+future **official two-source** outcome capsule. It MUST NOT run before
+the actual next trading session has closed and the TWSE rows are available.
+Prepare the future capsule with `forward_capture.py` outside the Git tree
+using the unchanged claimed rule-reference SHA from the source event.
+Retain the returned outcome `local_seal_sha256` separately.
+Since no original full rules ZIP is pinned for the old one-signal event,
+do not pass an unrelated recovered R3.6 frozen ZIP to imply verification.
+
+Example using already obtained private files (placeholders are not passwords):
+
+```sh
+python3 research/rebound_history/single_signal_outcome.py \
+  /private/REBOUND-PROSPECTIVE-20261120.zip \
+  361ee487f2c721531e19bfde3c8cb426f3300ca6f800952b3e5151e8fc49fd92 \
+  /private/2026-11-23/<captured-unique-directory> \
+  <independently-retained-outcome-local-seal-sha256> \
+  /private/t1-day-drop3-report.json
+```
+
+The verification rechecks the original eight ZIP members, whole-ZIP SHA256,
+the five-file local seal, receipt/source consistency, both official closes,
+the registered -3% event calculation, exact next-session date, and the
+separately retained seal hash of the later observation. It produces two
+**distinct** descriptive index changes: next-session open-to-close and
+signal-day close-to-next-session close, each rounded to six decimal places.
+Missing future reports, altered receipts, wrong pins, conflicting source
+closes and a different frozen-rule reference fail closed. Output uses
+exclusive creation outside the public Git repository.
+
+This does **not** establish a source's first-publication time, an
+independent cryptographic timestamp, calendar authenticity, execution
+prices, or predictive validity. The index itself is not directly tradable.
+The 3/5/10/20/40/60-session outcomes remain unobserved; the one-signal
+event remains `DESCRIPTIVE_ONLY_PIT_BLOCKED` and outside the 15-signal
+study, regardless of its T+1 price change.
