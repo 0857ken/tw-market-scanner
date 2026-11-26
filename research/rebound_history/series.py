@@ -42,28 +42,32 @@ def roc(value):
     return date(y + 1911, m, d)
 
 
-def price_month(body, tag, kind):
+def price_month(body, tag, kind, *, response_date=None, exact=False):
     obj = unique_json(body)
     fields = PRICE if kind == 'ohlc' else TURN
-    if obj.get('stat') != 'OK' or obj['date'][:6] != tag.replace('-', '') or obj['fields'] != fields:
+    if (obj.get('stat') != 'OK' or obj['date'][:6] != tag.replace('-', '') or
+            obj['fields'] != fields or
+            (response_date is not None and obj['date'] != response_date)):
         raise ValueError('wrong month, status or fields')
+    value = (lambda decimal: decimal) if exact else float
     rows = {}
     for line in obj['data']:
         if len(line) != len(fields):
             raise ValueError('unexpected row width')
         d = roc(line[0])
-        if d.isoformat()[:7] != tag or d in rows:
+        if (d.isoformat()[:7] != tag or d in rows or
+                (response_date is not None and line[0] != f'{d.year - 1911:03d}/{d:%m/%d}')):
             raise ValueError('unexpected or duplicate trade date')
         if kind == 'ohlc':
             o, h, l, c = map(number, line[1:])
             if not 0 < l <= min(o,c) <= max(o,c) <= h:
                 raise ValueError('invalid OHLC bounds')
-            rows[d] = {'open':float(o),'high':float(h),'low':float(l),'close':float(c)}
+            rows[d] = {'open':value(o),'high':value(h),'low':value(l),'close':value(c)}
         else:
             t, c = integer(line[2]), number(line[4])
             if t <= 0 or c <= 0:
                 raise ValueError('invalid index or turnover')
-            rows[d] = {'close':float(c),'turnover':t}
+            rows[d] = {'close':value(c),'turnover':t}
     if not rows or list(rows) != sorted(rows):
         raise ValueError('empty or unordered rows')
     return rows

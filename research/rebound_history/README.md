@@ -165,8 +165,9 @@ an external time service or immutable storage.
 The original TWSE OHLC path `/indicesReport/MI_5MINS_HIST` remains
 recognized for `date=YYYYMM01`. Its reviewed official successor
 `/rwd/zh/TAIEX/MI_5MINS_HIST` permits `date=YYYYMMDD` matching the
-requested session or `date=YYYYMM01` for that same month. Turnover remains
-`/exchangeReport/FMTQIK?response=json&date=YYYYMM01`. The source URL
+requested session or `date=YYYYMM01` for that same month. Turnover accepts
+legacy `/exchangeReport/FMTQIK` for the first of the month and official
+`/rwd/zh/afterTrading/FMTQIK` for the session or first of the month. The source URL
 and HTTP redirect target are checked **independently**, and both must use
 HTTPS, host `www.twse.com.tw` exactly, a reviewed path and exactly one
 `response=json` plus exactly one session-matching `date` parameter.
@@ -225,3 +226,33 @@ prices, or predictive validity. The index itself is not directly tradable.
 The 3/5/10/20/40/60-session outcomes remain unobserved; the one-signal
 event remains `DESCRIPTIVE_ONLY_PIT_BLOCKED` and outside the 15-signal
 study, regardless of its T+1 price change.
+
+
+### Verify the original six-member T+1 ZIP
+
+Use the `archive` command with the untouched T+1 ZIP and both SHA256 values
+from independently retained records. Keep the input and output outside Git
+working trees.
+
+```sh
+python3 research/rebound_history/single_signal_outcome.py archive \
+  /private/t1-original.zip \
+  <independently-retained-t1-zip-sha256> \
+  <independently-retained-original-signal-zip-sha256> \
+  /private/t1-verified.json
+```
+
+The command checks the complete outer ZIP, the embedded signal ZIP and its
+original five-file seal. The saved outcome bodies and receipts are read in
+place. Both URLs in each receipt must identify the corresponding TWSE RWD
+API and the exact outcome date. The verifier checks HTTP status, body
+digests, receipt timing, the report schemas and consecutive signal/outcome
+rows in both same-month reports. It checks the signal close against the
+original evidence, reconciles both outcome closes and recalculates the
+saved point changes and percentages. The private output preserves both
+receipts and the independently measured body sizes.
+
+The archive receipt provides local capture times. Calendar authenticity,
+first publication, signed timestamps and the frozen rule ZIP bytes still
+require independent evidence. The archive result remains
+`DESCRIPTIVE_ONLY_PIT_BLOCKED`.

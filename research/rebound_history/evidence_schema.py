@@ -36,17 +36,21 @@ def twse_urls(session):
     }
 
 
-def official_source_url(session, kind, url):
-    """Allow only reviewed TWSE routes for the exact observation session.
+RWD_SOURCE_PATHS = {
+    'ohlc': '/rwd/zh/TAIEX/MI_5MINS_HIST',
+    'turnover': '/rwd/zh/afterTrading/FMTQIK',
+}
+LEGACY_SOURCE_PATHS = {
+    'ohlc': '/indicesReport/MI_5MINS_HIST',
+    'turnover': '/exchangeReport/FMTQIK',
+}
 
-    RWD OHLC accepts a session-specific daily query or the first day of that
-    month; legacy monthly OHLC and turnover accept only first-of-month.
-    Query key order may differ, but duplicate/extra keys and redirects to
-    unexpected paths are never approved.
-    """
+
+def official_source_url(session, kind, url, *, rwd_session_only=False):
+    """Allow only reviewed TWSE routes with exact session or month queries."""
     day = iso_date(session).strftime('%Y%m%d')
     month = day[:6] + '01'
-    if not isinstance(url, str):
+    if not isinstance(url, str) or not re.fullmatch(r'[!-~]+', url) or '#' in url:
         return False
     try:
         parsed = urlsplit(url)
@@ -54,24 +58,20 @@ def official_source_url(session, kind, url):
     except ValueError:
         return False
     if (parsed.scheme != 'https' or parsed.netloc != 'www.twse.com.tw' or
-            parsed.fragment or len(fields) != 2 or
-            set(key for key, _ in fields) != {'date', 'response'}):
+            len(fields) != 2 or set(key for key, _ in fields) != {'date', 'response'}):
         return False
     query = dict(fields)
     if query['response'] != 'json':
         return False
-    if kind == 'ohlc':
-        if parsed.path == '/indicesReport/MI_5MINS_HIST':
-            return query['date'] == month
-        if parsed.path == '/rwd/zh/TAIEX/MI_5MINS_HIST':
-            return query['date'] in (month, day)
-    if kind == 'turnover' and parsed.path == '/exchangeReport/FMTQIK':
-        return query['date'] == month
-    return False
+    if parsed.path == RWD_SOURCE_PATHS.get(kind):
+        allowed_dates = (day,) if rwd_session_only else (month, day)
+        return query['date'] in allowed_dates
+    return (not rwd_session_only and parsed.path == LEGACY_SOURCE_PATHS.get(kind)
+            and query['date'] == month)
 
 
-def verify_source_endpoints(session, kind, requested, effective):
-    if not official_source_url(session, kind, requested):
+def verify_source_endpoints(session, kind, requested, effective, *, rwd_session_only=False):
+    if not official_source_url(session, kind, requested, rwd_session_only=rwd_session_only):
         raise ValueError('source request endpoint or query differs from approved TWSE routes')
-    if not official_source_url(session, kind, effective):
+    if not official_source_url(session, kind, effective, rwd_session_only=rwd_session_only):
         raise ValueError('source effective endpoint or query differs from approved TWSE routes')
